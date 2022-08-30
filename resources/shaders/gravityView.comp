@@ -1,0 +1,113 @@
+#version 460
+
+#define PI 3.14159265359f
+
+struct ParticleData
+{
+	vec2 position;
+	vec2 velocity;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer toto
+{
+	ParticleData[] u_inputParticles;
+};
+
+layout(set = 0, binding = 1, rgba8) uniform writeonly image2D u_outputImage;
+
+layout(push_constant) uniform constants
+{
+	mat4 u_vp;
+	uint u_particleCount;
+};
+
+vec2 remap(vec2 value, vec2 low1, vec2 high1, vec2 low2, vec2 high2)
+{
+	return low2 + (value - low1) * (high2 - low2) / (high1 - low1);
+}
+
+vec2 transformPixelPos(vec2 pixelPos, vec2 imageSize)
+{
+	vec4 pixelPos4D = vec4(remap(pixelPos, vec2(0, 0), imageSize, vec2(-1, -1), vec2(1, 1)), 0, 1);
+	
+	mat4 vpInverse = inverse(u_vp);
+	
+	pixelPos4D = vpInverse * pixelPos4D;
+	pixelPos4D.x /= pixelPos4D.w;
+	pixelPos4D.y /= pixelPos4D.w;
+	pixelPos4D.z /= pixelPos4D.w;
+	
+	return vec2(pixelPos4D.x, pixelPos4D.y);
+}
+
+vec2 calcGravity(vec2 thisPosition, vec2 otherPosition, float gravityStrength, float power)
+{
+	vec2 thisToOther = otherPosition - thisPosition;
+	float distance = length(thisToOther);
+	if (distance > 0)
+	{
+		thisToOther /= distance;
+	}
+	else
+	{
+		thisToOther = vec2(0);
+	}
+	
+	float force = gravityStrength / pow(distance + 1.0f, power);
+	
+	return thisToOther * force;
+}
+
+vec3 calcPalette(float value)
+{
+	value = clamp(value, 0.0f, 1.0f);
+	
+	vec3 a = vec3(0.00f, 0.00f, 0.00f);
+	vec3 b = vec3(0.13f, 0.00f, 0.55f);
+	vec3 c = vec3(0.80f, 0.00f, 0.47f);
+	vec3 d = vec3(1.00f, 0.84f, 0.00f);
+	vec3 e = vec3(1.00f, 1.00f, 1.00f);
+	
+	if (value <= 0.25f)
+	{
+		return mix(a, b, (value - 0.00f) * 4.0f);
+	}
+	if (value <= 0.50f)
+	{
+		return mix(b, c, (value - 0.25f) * 4.0f);
+	}
+	if (value <= 0.75f)
+	{
+		return mix(c, d, (value - 0.50f) * 4.0f);
+	}
+	if (value <= 1.00f)
+	{
+		return mix(d, e, (value - 0.75f) * 4.0f);
+	}
+	
+	return vec3(0.0f, 1.0f, 0.0f);
+}
+
+layout (local_size_x = 32, local_size_y = 32) in;
+void main()
+{
+	ivec2 outputImageSize = imageSize(u_outputImage);
+	ivec2 pixelPos = ivec2(gl_GlobalInvocationID.xy);
+	if (any(greaterThanEqual(pixelPos, outputImageSize)))
+	{
+		return;
+	}
+	
+	vec2 pixelWorldPos = transformPixelPos(vec2(pixelPos) + 0.5f, outputImageSize);
+	
+	float gravity = 0.0f;
+	
+	for (uint i = 0; i < u_particleCount; i++)
+	{
+		vec2 particlePos = u_inputParticles[i].position;
+		
+		gravity += length(calcGravity(pixelWorldPos, particlePos, 0.1f, 8.0f));
+	}
+	
+	imageStore(u_outputImage, pixelPos, vec4(calcPalette(gravity), 1));
+}

@@ -1,0 +1,128 @@
+#version 460
+
+struct ParticleData
+{
+	vec2 position;
+	vec2 velocity;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer toto
+{
+	ParticleData[] u_inputParticles;
+};
+
+layout(std430, set = 0, binding = 1) writeonly buffer tata
+{
+	ParticleData[] u_outputParticles;
+};
+
+layout(push_constant) uniform constants
+{
+	float u_deltaTime;
+	uint u_particleCount;
+	vec2 u_cursorGravityPos;
+	bool u_cursorGravityEnabled;
+	bool u_particlesGravityEnabled;
+};
+
+vec2 calcGravity(vec2 thisPosition, vec2 otherPosition, float gravityStrength, float power)
+{
+	vec2 thisToOther = otherPosition - thisPosition;
+	float distance = length(thisToOther);
+	if (distance > 0)
+	{
+		thisToOther /= distance;
+	}
+	else
+	{
+		thisToOther = vec2(0);
+	}
+	
+	float force = gravityStrength / pow(distance + 1.0f, power);
+	
+	return thisToOther * force * u_deltaTime;
+}
+
+float calcFalloff(float falloffPerSecond)
+{
+	float falloff = falloffPerSecond;
+	falloff = 1.0f - falloff;
+	falloff *= u_deltaTime;
+	return 1.0f - falloff;
+}
+
+layout (local_size_x = 1024) in;
+void main()
+{
+	uint particleIndex = gl_GlobalInvocationID.x;
+	if (particleIndex >= u_particleCount)
+	{
+		return;
+	}
+	
+	ParticleData particle = u_inputParticles[particleIndex];
+	
+	if (u_cursorGravityEnabled)
+	{
+		particle.velocity += calcGravity(particle.position, u_cursorGravityPos, 50.0f, 2.0f);
+	}
+	
+	if (u_particlesGravityEnabled)
+	{
+		for (uint i = 0; i < u_particleCount; i++)
+		{
+			if (i == particleIndex)
+			{
+				continue;
+			}
+			
+			particle.velocity += calcGravity(particle.position, u_inputParticles[i].position, 0.01f, 4.0f);
+		}
+	}
+	
+	particle.velocity *= calcFalloff(0.9f);
+	
+	particle.position += particle.velocity * u_deltaTime;
+	
+	u_outputParticles[particleIndex] = particle;
+	
+	// semi-accurate bounce algorithm
+//	vec2 potentialDeltaPosition = particle.velocity * u_deltaTime;
+//	vec2 potentialNextPosition = particle.position + potentialDeltaPosition;
+//	
+//	vec2 velocityRatioBeforeSwap = vec2(1.0f, 1.0f);
+//	
+//	if (potentialNextPosition.x < 0.0f)
+//	{
+//		float relativeWallPos = 0.0f - particle.position.x;
+//		velocityRatioBeforeSwap.x = relativeWallPos / potentialDeltaPosition.x;
+//	}
+//	else if (potentialNextPosition.x > 10.0f)
+//	{
+//		float relativeWallPos = 10.0f - particle.position.x;
+//		velocityRatioBeforeSwap.x = relativeWallPos / potentialDeltaPosition.x;
+//	}
+//	
+//	if (potentialNextPosition.y < 0.0f)
+//	{
+//		float relativeWallPos = 0.0f - particle.position.y;
+//		velocityRatioBeforeSwap.y = relativeWallPos / potentialDeltaPosition.y;
+//	}
+//	else if (potentialNextPosition.y > 10.0f)
+//	{
+//		float relativeWallPos = 10.0f - particle.position.y;
+//		velocityRatioBeforeSwap.y = relativeWallPos / potentialDeltaPosition.y;
+//	}
+//	
+//	particle.position += particle.velocity * u_deltaTime * velocityRatioBeforeSwap;
+//	if (velocityRatioBeforeSwap.x < 1.0f)
+//	{
+//		particle.velocity.x = -particle.velocity.x;
+//		particle.position.x += particle.velocity.x * u_deltaTime * (1.0f - velocityRatioBeforeSwap.x);
+//	}
+//	if (velocityRatioBeforeSwap.y < 1.0f)
+//	{
+//		particle.velocity.y = -particle.velocity.y;
+//		particle.position.y += particle.velocity.y * u_deltaTime * (1.0f - velocityRatioBeforeSwap.y);
+//	}
+}
