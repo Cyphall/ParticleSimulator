@@ -1,27 +1,22 @@
 #pragma once
 
-#include <filesystem>
-#include <optional>
+#include <ParticleSimulator/VKObject/VKObject.h>
+
 #include <vulkan/vulkan.hpp>
 
-class VKDescriptorSet;
+class VKPipelineLayout;
 
-class VKPipeline
+class VKPipeline : public VKObject
 {
 public:
-	virtual ~VKPipeline() = default;
-	
 	vk::Pipeline getHandle();
-	vk::PipelineLayout getPipelineLayout();
-	
-	void bindDescriptorSet(vk::CommandBuffer commandBuffer, uint32_t set, VKDescriptorSet& descriptorSet);
-	void bindDescriptorSet(vk::CommandBuffer commandBuffer, uint32_t set, VKDescriptorSet& descriptorSet, uint32_t dynamicOffset);
-
-protected:
-	VKPipeline() = default;
-	
-	vk::PipelineLayout _pipelineLayout;
-	vk::Pipeline _pipeline;
+	const VKPtr<VKPipelineLayout>& getPipelineLayout();
 	
 	virtual vk::PipelineBindPoint getPipelineType() = 0;
+
+protected:
+	explicit VKPipeline(VKContext& context, const VKPtr<VKPipelineLayout>& pipelineLayout);
+	
+	VKPtr<VKPipelineLayout> _pipelineLayout;
+	vk::Pipeline _pipeline;
 };

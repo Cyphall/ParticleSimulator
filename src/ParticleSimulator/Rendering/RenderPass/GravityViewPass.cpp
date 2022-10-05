@@ -1,70 +1,80 @@
 #include "GravityViewPass.h"
 
 #include <ParticleSimulator/RenderContext.h>
-#include <ParticleSimulator/VKObject/Dynamic/VKDynamicBuffer.h>
+#include <ParticleSimulator/VKObject/Buffer/VKBuffer.h>
 #include <ParticleSimulator/VKObject/Pipeline/VKPipelineLayoutInfo.h>
+#include <ParticleSimulator/VKObject/Pipeline/VKPipelineLayout.h>
 #include <ParticleSimulator/VKObject/Pipeline/VKComputePipeline.h>
-#include <ParticleSimulator/VKObject/VKDescriptorSetLayoutBuilder.h>
-#include <ParticleSimulator/VKObject/VKDescriptorSet.h>
-#include <ParticleSimulator/VKObject/VKImage.h>
+#include <ParticleSimulator/VKObject/DescriptorSet/VKDescriptorSetLayoutInfo.h>
+#include <ParticleSimulator/VKObject/DescriptorSet/VKDescriptorSetLayout.h>
+#include <ParticleSimulator/VKObject/DescriptorSet/VKDescriptorSet.h>
+#include <ParticleSimulator/VKObject/CommandBuffer/VKCommandBuffer.h>
+#include <ParticleSimulator/VKObject/Image/VKImageBase.h>
 #include <ParticleSimulator/Camera.h>
 
 GravityViewPass::GravityViewPass()
 {
 	createDescriptorSetsLayout();
 	createDescriptorSets();
+	createPipelineLayout();
 	createPipeline();
 }
 
 GravityViewPass::~GravityViewPass()
 {
-	_pipeline.reset();
-	_particlesDescriptorSet.reset();
-	_particlesDescriptorSetLayout.reset();
+	
 }
 
-GravityViewPass::RenderOutput GravityViewPass::render(vk::CommandBuffer commandBuffer, const GravityViewPass::RenderInput& input)
+GravityViewPass::RenderOutput GravityViewPass::render(const VKPtr<VKCommandBuffer>& commandBuffer, const GravityViewPass::RenderInput& input)
 {
-	commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, _pipeline->getHandle());
+	commandBuffer->bindPipeline(_pipeline);
 	
-	_particlesDescriptorSet->bindBuffer(0, input.particlesBuffer->getHandle());
-	_particlesDescriptorSet->bindImage(1, input.outputImage->getView(), input.outputImage->getLayout());
-	_pipeline->bindDescriptorSet(commandBuffer, 0, *_particlesDescriptorSet);
+	_particlesDescriptorSet->bindBuffer(0, *input.particlesBuffer);
+	_particlesDescriptorSet->bindImage(1, input.outputImage);
+	commandBuffer->bindDescriptorSet(0, _particlesDescriptorSet);
 	
 	PushConstantData pushConstantData{};
 	pushConstantData.vp = input.camera->getProjection() * input.camera->getView();
 	pushConstantData.particleCount = input.particleCount;
-	commandBuffer.pushConstants(_pipeline->getPipelineLayout(), vk::ShaderStageFlagBits::eCompute, 0, sizeof(PushConstantData), &pushConstantData);
+	commandBuffer->pushConstants(vk::ShaderStageFlagBits::eCompute, pushConstantData);
 	
-	commandBuffer.dispatch(
-		std::max<uint32_t>(std::ceil(input.outputImage->getExtent().width / 32.0), 1),
-		std::max<uint32_t>(std::ceil(input.outputImage->getExtent().height / 32.0), 1),
-		1
-	);
+	commandBuffer->dispatch({
+		std::max<uint32_t>(std::ceil(input.outputImage->getSize().x / 32.0), 1),
+		std::max<uint32_t>(std::ceil(input.outputImage->getSize().y / 32.0), 1),
+		1});
+	
+	commandBuffer->unbindPipeline();
 	
 	return {};
 }
 
 void GravityViewPass::createDescriptorSetsLayout()
 {
-	_particlesDescriptorSetLayout = VKDescriptorSetLayoutBuilder()
-		.registerBinding(0, vk::DescriptorType::eStorageBuffer, 1)
-		.registerBinding(1, vk::DescriptorType::eStorageImage, 1)
-		.build();
+	VKDescriptorSetLayoutInfo descriptorSetLayoutInfo;
+	descriptorSetLayoutInfo.registerBinding(0, vk::DescriptorType::eStorageBuffer, 1);
+	descriptorSetLayoutInfo.registerBinding(1, vk::DescriptorType::eStorageImage, 1);
+	
+	_particlesDescriptorSetLayout = VKDescriptorSetLayout::create(*RenderContext::vkContext, descriptorSetLayoutInfo);
 }
 
 void GravityViewPass::createDescriptorSets()
 {
-	_particlesDescriptorSet = std::make_unique<VKDescriptorSet>(*_particlesDescriptorSetLayout);
+	_particlesDescriptorSet = VKDescriptorSet::create(*RenderContext::vkContext, _particlesDescriptorSetLayout);
+}
+
+void GravityViewPass::createPipelineLayout()
+{
+	VKPipelineLayoutInfo pipelineLayoutInfo;
+	pipelineLayoutInfo.registerDescriptorSetLayout(_particlesDescriptorSetLayout);
+	pipelineLayoutInfo.registerPushConstantLayout<PushConstantData>(vk::ShaderStageFlagBits::eCompute);
+	
+	_pipelineLayout = VKPipelineLayout::create(*RenderContext::vkContext, pipelineLayoutInfo);
 }
 
 void GravityViewPass::createPipeline()
 {
-	VKPipelineLayoutInfo descriptorLayout;
-	descriptorLayout.registerDescriptorSetLayout(*_particlesDescriptorSetLayout);
-	descriptorLayout.registerPushConstantLayout<PushConstantData>(vk::ShaderStageFlagBits::eCompute);
-	
-	_pipeline = std::make_unique<VKComputePipeline>(
+	_pipeline = VKComputePipeline::create(
+		*RenderContext::vkContext,
 		"resources/shaders/gravityView.comp",
-		descriptorLayout);
+		_pipelineLayout);
 }

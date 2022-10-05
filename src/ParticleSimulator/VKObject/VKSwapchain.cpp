@@ -1,14 +1,20 @@
 #include "VKSwapchain.h"
 
-#include <ParticleSimulator/RenderContext.h>
 #include <ParticleSimulator/VKObject/VKContext.h>
-#include <ParticleSimulator/VKObject/VKSwapchainImage.h>
-#include <ParticleSimulator/VKObject/VKSwapchainSemaphore.h>
+#include <ParticleSimulator/VKObject/VKDynamic.h>
+#include <ParticleSimulator/VKObject/Image/VKSwapchainImage.h>
+#include <ParticleSimulator/VKObject/Semaphore/VKSemaphore.h>
 
 #include <GLFW/glfw3.h>
 #include <iostream>
 
-VKSwapchain::VKSwapchain()
+std::unique_ptr<VKSwapchain> VKSwapchain::create(VKContext& context)
+{
+	return std::unique_ptr<VKSwapchain>(new VKSwapchain(context));
+}
+
+VKSwapchain::VKSwapchain(VKContext& context):
+	VKObject(context)
 {
 	createSwapchain();
 	createSemaphore();
@@ -16,8 +22,7 @@ VKSwapchain::VKSwapchain()
 
 VKSwapchain::~VKSwapchain()
 {
-	_semaphore.reset();
-	RenderContext::vkContext->getDevice().destroySwapchainKHR(_swapchain);
+	_context.getDevice().destroySwapchainKHR(_swapchain);
 }
 
 size_t VKSwapchain::getDynamicCount() const
@@ -25,20 +30,20 @@ size_t VKSwapchain::getDynamicCount() const
 	return _swapchainImages.size();
 }
 
-std::tuple<VKSwapchainImage&, vk::Semaphore> VKSwapchain::retrieveNextImage()
+std::tuple<const VKPtr<VKSwapchainImage>&, const VKPtr<VKSemaphore>&> VKSwapchain::retrieveNextImage()
 {
 	_currentDynamicIndex = (_currentDynamicIndex + 1) % getDynamicCount();
 	
-	vk::Semaphore currentSemaphore = _semaphore->get();
+	const VKPtr<VKSemaphore>& currentSemaphore = *_semaphore;
 	
-	auto [result, imageIndex] = RenderContext::vkContext->getDevice().acquireNextImageKHR(_swapchain, UINT64_MAX, currentSemaphore, VK_NULL_HANDLE);
+	auto [result, imageIndex] = _context.getDevice().acquireNextImageKHR(_swapchain, UINT64_MAX, currentSemaphore->getHandle(), VK_NULL_HANDLE);
 	if (result == vk::Result::eSuboptimalKHR)
 	{
 		std::cout << "WARNING: Suboptimal swapchain." << std::endl;
 	}
 	_currentImageIndex = imageIndex;
 	
-	return std::make_tuple(std::ref(*_swapchainImages[_currentImageIndex]), currentSemaphore);
+	return std::make_tuple(std::ref(_swapchainImages[_currentImageIndex]), std::ref(currentSemaphore));
 }
 
 uint32_t VKSwapchain::getCurrentDynamicIndex() const
@@ -46,17 +51,14 @@ uint32_t VKSwapchain::getCurrentDynamicIndex() const
 	return _currentDynamicIndex;
 }
 
-void VKSwapchain::present(vk::Semaphore semaphoreToWait)
+uint32_t VKSwapchain::getCurrentImageIndex() const
 {
-	vk::PresentInfoKHR presentInfo;
-	presentInfo.waitSemaphoreCount = 1;
-	presentInfo.pWaitSemaphores = &semaphoreToWait;
-	presentInfo.swapchainCount = 1;
-	presentInfo.pSwapchains = &_swapchain;
-	presentInfo.pImageIndices = &_currentImageIndex;
-	presentInfo.pResults = nullptr; // Optional
-	
-	RenderContext::vkContext->getMainQueue().presentKHR(presentInfo);
+	return _currentImageIndex;
+}
+
+vk::SwapchainKHR& VKSwapchain::getHandle()
+{
+	return _swapchain;
 }
 
 vk::Format VKSwapchain::getFormat() const
@@ -64,9 +66,9 @@ vk::Format VKSwapchain::getFormat() const
 	return _swapchainImages.front()->getFormat();
 }
 
-vk::Extent2D VKSwapchain::getExtent() const
+const glm::uvec2& VKSwapchain::getSize() const
 {
-	return _swapchainImages.front()->getExtent();
+	return _swapchainImages.front()->getSize();
 }
 
 vk::SurfaceFormatKHR VKSwapchain::chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats)
@@ -97,7 +99,7 @@ vk::Extent2D VKSwapchain::chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& cap
 	
 	int width;
 	int height;
-	glfwGetFramebufferSize(RenderContext::vkContext->getWindow(), &width, &height);
+	glfwGetFramebufferSize(_context.getWindow(), &width, &height);
 	
 	vk::Extent2D extent;
 	extent.width = width;
@@ -111,7 +113,7 @@ vk::Extent2D VKSwapchain::chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& cap
 
 void VKSwapchain::createSwapchain()
 {
-	VKContext::SwapChainSupportDetails swapChainSupport = RenderContext::vkContext->querySwapchainSupport(RenderContext::vkContext->getPhysicalDevice());
+	VKContext::SwapChainSupportDetails swapChainSupport = _context.querySwapchainSupport(_context.getPhysicalDevice());
 	
 	vk::SurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
 	PresentModeDetails presentModeDetails = chooseSwapPresentMode(swapChainSupport.presentModes);
@@ -123,7 +125,7 @@ void VKSwapchain::createSwapchain()
 		swapChainSupport.capabilities.maxImageCount == 0 ? std::numeric_limits<uint32_t>::max() : swapChainSupport.capabilities.maxImageCount);
 	
 	vk::SwapchainCreateInfoKHR createInfo;
-	createInfo.surface = RenderContext::vkContext->getSurface();
+	createInfo.surface = _context.getSurface();
 	createInfo.minImageCount = imageCount;
 	createInfo.imageFormat = surfaceFormat.format;
 	createInfo.imageColorSpace = surfaceFormat.colorSpace;
@@ -139,17 +141,17 @@ void VKSwapchain::createSwapchain()
 	createInfo.clipped = VK_TRUE;
 	createInfo.oldSwapchain = VK_NULL_HANDLE;
 	
-	_swapchain = RenderContext::vkContext->getDevice().createSwapchainKHR(createInfo);
+	_swapchain = _context.getDevice().createSwapchainKHR(createInfo);
 	
-	std::vector<vk::Image> swapchainImages = RenderContext::vkContext->getDevice().getSwapchainImagesKHR(_swapchain);
+	std::vector<vk::Image> swapchainImages = _context.getDevice().getSwapchainImagesKHR(_swapchain);
 	for (vk::Image image : swapchainImages)
 	{
-		_swapchainImages.push_back(std::make_unique<VKSwapchainImage>(image, surfaceFormat.format, extent));
+		_swapchainImages.push_back(VKPtr<VKSwapchainImage>(new VKSwapchainImage(_context, image, surfaceFormat.format, glm::uvec2(extent.width, extent.height))));
 	}
 }
 
 void VKSwapchain::createSemaphore()
 {
 	vk::SemaphoreCreateInfo semaphoreCreateInfo;
-	_semaphore = std::make_unique<VKSwapchainSemaphore>(getDynamicCount(), semaphoreCreateInfo);
+	_semaphore = VKSemaphore::createDynamic(_context, *this, semaphoreCreateInfo);
 }

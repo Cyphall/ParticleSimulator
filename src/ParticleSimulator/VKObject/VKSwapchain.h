@@ -1,26 +1,33 @@
 #pragma once
 
+#include <ParticleSimulator/VKObject/VKObject.h>
+
 #include <vulkan/vulkan.hpp>
+#include <glm/glm.hpp>
 
+template<typename T>
+class VKDynamic;
 class VKSwapchainImage;
-class VKSwapchainSemaphore;
+class VKSemaphore;
 
-class VKSwapchain
+class VKSwapchain : public VKObject
 {
 public:
-	VKSwapchain();
-	~VKSwapchain();
+	static std::unique_ptr<VKSwapchain> create(VKContext& context);
+	
+	~VKSwapchain() override;
 	
 	size_t getDynamicCount() const;
 	
-	std::tuple<VKSwapchainImage&, vk::Semaphore> retrieveNextImage();
+	std::tuple<const VKPtr<VKSwapchainImage>&, const VKPtr<VKSemaphore>&> retrieveNextImage();
 	
 	uint32_t getCurrentDynamicIndex() const;
+	uint32_t getCurrentImageIndex() const;
 	
-	void present(vk::Semaphore semaphoreToWait);
+	vk::SwapchainKHR& getHandle();
 	
 	vk::Format getFormat() const;
-	vk::Extent2D getExtent() const;
+	const glm::uvec2& getSize() const;
 	
 private:
 	struct PresentModeDetails
@@ -29,19 +36,21 @@ private:
 		uint32_t preferredImageCount;
 	};
 	
-	vk::SwapchainKHR _swapchain;
+	explicit VKSwapchain(VKContext& context);
 	
-	std::vector<std::unique_ptr<VKSwapchainImage>> _swapchainImages;
-	uint32_t _currentImageIndex = -1;
-	
-	std::unique_ptr<VKSwapchainSemaphore> _semaphore;
-	
-	uint32_t _currentDynamicIndex = 0;
-	
-	static vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats);
-	static PresentModeDetails chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes);
-	static vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities);
+	vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats);
+	PresentModeDetails chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes);
+	vk::Extent2D chooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities);
 	
 	void createSwapchain();
 	void createSemaphore();
+	
+	vk::SwapchainKHR _swapchain;
+	
+	std::vector<VKPtr<VKSwapchainImage>> _swapchainImages;
+	uint32_t _currentImageIndex = -1;
+	
+	std::unique_ptr<VKDynamic<VKSemaphore>> _semaphore;
+	
+	uint32_t _currentDynamicIndex = 0;
 };

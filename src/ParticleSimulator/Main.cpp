@@ -40,7 +40,7 @@ int main()
 	glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 	glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, true);
 	
-	RenderContext::vkContext = std::make_unique<VKContext>(window);
+	RenderContext::vkContext = VKContext::create(window);
 	
 	Camera camera({0, 0, 0});
 	
@@ -71,8 +71,8 @@ int main()
 		
 		if (!RenderContext::swapchain)
 		{
-			RenderContext::swapchain = std::make_unique<VKSwapchain>();
-			camera.setScreenSize({RenderContext::swapchain->getExtent().width, RenderContext::swapchain->getExtent().height});
+			RenderContext::swapchain = VKSwapchain::create(*RenderContext::vkContext);
+			camera.setScreenSize(RenderContext::swapchain->getSize());
 		}
 		if (!RenderContext::renderer)
 		{

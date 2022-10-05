@@ -1,5 +1,9 @@
 #include "VKContext.h"
 
+#include <ParticleSimulator/VKObject/CommandBuffer/VKCommandBuffer.h>
+#include <ParticleSimulator/VKObject/Queue/VKQueue.h>
+
+#include <memory>
 #include <vector>
 #include <unordered_set>
 #include <map>
@@ -43,6 +47,11 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL messageCallback(vk::DebugUtilsMessageSev
 	return VK_FALSE;
 }
 
+std::unique_ptr<VKContext> VKContext::create(GLFWwindow* window)
+{
+	return std::unique_ptr<VKContext>(new VKContext(window));
+}
+
 VKContext::VKContext(GLFWwindow* window):
 _window(window)
 {
@@ -62,21 +71,17 @@ _window(window)
 	createMessenger();
 	createSurface();
 	selectPhysicalDevice();
-	selectQueueFamilies();
 	createLogicalDevice();
 	
 	VULKAN_HPP_DEFAULT_DISPATCHER.init(_device);
 	
 	createVmaAllocator();
-	createImmediateFence();
-	createImmediateCommandPool();
 	createImmediateCommandBuffer();
 }
 
 VKContext::~VKContext()
 {
-	_device.destroyCommandPool(_immediateCommandPool);
-	_device.destroyFence(_immediateFence);
+	_immediateCommandBuffer.reset();
 	_vmaAllocator.destroy();
 	_device.destroy();
 	_instance.destroySurfaceKHR(_surface);
@@ -104,14 +109,9 @@ vk::Device VKContext::getDevice()
 	return _device;
 }
 
-uint32_t VKContext::getMainQueueFamily()
+VKQueue& VKContext::getQueue()
 {
-	return _mainQueueFamily;
-}
-
-vk::Queue VKContext::getMainQueue()
-{
-	return _mainQueue;
+	return *_queue;
 }
 
 GLFWwindow* VKContext::getWindow()
@@ -128,6 +128,29 @@ VKContext::SwapChainSupportDetails VKContext::querySwapchainSupport(const vk::Ph
 	details.presentModes = device.getSurfacePresentModesKHR(_surface);
 	
 	return details;
+}
+
+vma::Allocator VKContext::getVmaAllocator()
+{
+	return _vmaAllocator;
+}
+
+void VKContext::executeImmediate(std::function<void(const VKPtr<VKCommandBuffer>& commandBuffer)>&& function)
+{
+	_immediateCommandBuffer->begin();
+	
+	function(_immediateCommandBuffer);
+	
+	_immediateCommandBuffer->end();
+	
+	_queue->submit(
+		_immediateCommandBuffer,
+		vk::PipelineStageFlagBits::eBottomOfPipe,
+		nullptr,
+		nullptr);
+	
+	_immediateCommandBuffer->waitExecution();
+	_immediateCommandBuffer->reset();
 }
 
 int VKContext::calculateDeviceScore(const vk::PhysicalDevice& device) const
@@ -215,9 +238,9 @@ void VKContext::fillInstanceExtensions()
 		_instanceExtensions.push_back(glfwExtensions[i]);
 	}
 
-	_instanceExtensions.push_back("VK_EXT_debug_utils");
+	_instanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #if _DEBUG
-	_instanceExtensions.push_back("VK_EXT_validation_features");
+	_instanceExtensions.push_back(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
 #endif
 }
 
@@ -230,7 +253,7 @@ void VKContext::fillLayers()
 
 void VKContext::fillDeviceExtensions()
 {
-	_deviceExtensions.push_back("VK_KHR_swapchain");
+	_deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 }
 
 void VKContext::checkInstanceExtensionSupport()
@@ -381,51 +404,49 @@ void VKContext::selectPhysicalDevice()
 	if (!bestDevice)
 	{
 		std::stringstream errorMessage;
-		errorMessage << "Could not find a device supporting Vulkan 1.2.\n";
+		errorMessage << "Could not find a device supporting required Vulkan version and/or extensions.\n";
 		errorMessage << "Please make sure your GPU is compatible and your driver is up to date.\n\n";
+		errorMessage << "Required Vulkan version: " << VK_API_VERSION_MAJOR(VULKAN_VERSION) << '.' << VK_API_VERSION_MINOR(VULKAN_VERSION) << "\n\n";
+		errorMessage << "Required Vulkan device extensions:\n";
+		for (const char* extension : _deviceExtensions)
+		{
+			errorMessage << '\t' << extension << '\n';
+		}
+		errorMessage << '\n';
 		throw std::runtime_error(errorMessage.str());
 	}
 	
 	_physicalDevice = bestDevice;
 }
 
-void VKContext::selectQueueFamilies()
+uint32_t VKContext::findSuitableQueueFamily()
 {
 	std::vector<vk::QueueFamilyProperties> vkQueueFamilies = _physicalDevice.getQueueFamilyProperties();
 	
-	vk::QueueFlags flags = vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eTransfer;
+	vk::QueueFlags flags = vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer;
 	
 	for (int i = 0; i < vkQueueFamilies.size(); i++)
 	{
 		vk::QueueFamilyProperties queueFamilyProperties = vkQueueFamilies[i];
 		if ((queueFamilyProperties.queueFlags & flags) == flags && _physicalDevice.getSurfaceSupportKHR(i, _surface))
 		{
-			_mainQueueFamily = i;
-			break;
+			return i;
 		}
 	}
+	
+	throw;
 }
 
 void VKContext::createLogicalDevice()
 {
-	std::map<uint32_t, size_t> queueFamilies;
-	queueFamilies[_mainQueueFamily]++;
+	uint32_t queueFamily = findSuitableQueueFamily();
 	
-	std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
-	std::vector<std::vector<float>> queuesPriorities;
-	for (const auto& [id, count] : queueFamilies)
-	{
-		std::vector<float>& queuePriorities = queuesPriorities.emplace_back(count);
-		for (int i = 0; i < count; i++)
-		{
-			queuePriorities[i] = 1.0f;
-		}
-		
-		vk::DeviceQueueCreateInfo& queueCreateInfo = queueCreateInfos.emplace_back();
-		queueCreateInfo.queueFamilyIndex = id;
-		queueCreateInfo.queueCount = count;
-		queueCreateInfo.pQueuePriorities = queuePriorities.data();
-	}
+	float queuePriority = 1.0f;
+	
+	vk::DeviceQueueCreateInfo deviceQueueCreateInfo;
+	deviceQueueCreateInfo.queueFamilyIndex = queueFamily;
+	deviceQueueCreateInfo.queueCount = 1;
+	deviceQueueCreateInfo.pQueuePriorities = &queuePriority;
 	
 	vk::PhysicalDeviceRobustness2FeaturesEXT robustness2Features;
 	robustness2Features.nullDescriptor = VK_TRUE;
@@ -448,8 +469,8 @@ void VKContext::createLogicalDevice()
 	
 	vk::DeviceCreateInfo deviceCreateInfo;
 	deviceCreateInfo.pNext = &physicalDeviceFeatures;
-	deviceCreateInfo.queueCreateInfoCount = queueCreateInfos.size();
-	deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
+	deviceCreateInfo.queueCreateInfoCount = 1;
+	deviceCreateInfo.pQueueCreateInfos = &deviceQueueCreateInfo;
 	deviceCreateInfo.enabledExtensionCount = _deviceExtensions.size();
 	deviceCreateInfo.ppEnabledExtensionNames = _deviceExtensions.data();
 	deviceCreateInfo.enabledLayerCount = 0;
@@ -457,46 +478,7 @@ void VKContext::createLogicalDevice()
 	
 	_device = _physicalDevice.createDevice(deviceCreateInfo);
 	
-	_mainQueue = _device.getQueue(_mainQueueFamily, --queueFamilies[_mainQueueFamily]);
-}
-
-vma::Allocator VKContext::getVmaAllocator()
-{
-	return _vmaAllocator;
-}
-
-void VKContext::executeImmediate(std::function<void(vk::CommandBuffer)>&& function)
-{
-	vk::CommandBufferBeginInfo commandBufferBeginInfo;
-	commandBufferBeginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
-	commandBufferBeginInfo.pInheritanceInfo = nullptr; // Optional
-	
-	_immediateCommandBuffer.begin(commandBufferBeginInfo);
-	
-	function(_immediateCommandBuffer);
-	
-	_immediateCommandBuffer.end();
-	
-	vk::PipelineStageFlags waitStages = vk::PipelineStageFlagBits::eBottomOfPipe;
-	
-	vk::SubmitInfo submitInfo;
-	submitInfo.waitSemaphoreCount = 0;
-	submitInfo.pWaitSemaphores = nullptr;
-	submitInfo.pWaitDstStageMask = &waitStages;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &_immediateCommandBuffer;
-	submitInfo.signalSemaphoreCount = 0;
-	submitInfo.pSignalSemaphores = nullptr;
-	
-	_mainQueue.submit(submitInfo, _immediateFence);
-	
-	if (_device.waitForFences(_immediateFence, true, UINT64_MAX) != vk::Result::eSuccess)
-	{
-		throw;
-	}
-	_device.resetFences(_immediateFence);
-	
-	_device.resetCommandPool(_immediateCommandPool);
+	_queue = std::unique_ptr<VKQueue>(new VKQueue(*this, queueFamily, 0));
 }
 
 void VKContext::createVmaAllocator()
@@ -515,27 +497,7 @@ void VKContext::createVmaAllocator()
 	vma::createAllocator(&allocatorInfo, &_vmaAllocator);
 }
 
-void VKContext::createImmediateFence()
-{
-	vk::FenceCreateInfo createInfo;
-	_immediateFence = _device.createFence(createInfo);
-}
-
-void VKContext::createImmediateCommandPool()
-{
-	vk::CommandPoolCreateInfo poolCreateInfo;
-	poolCreateInfo.flags = {};
-	poolCreateInfo.queueFamilyIndex = _mainQueueFamily;
-	
-	_immediateCommandPool = _device.createCommandPool(poolCreateInfo);
-}
-
 void VKContext::createImmediateCommandBuffer()
 {
-	vk::CommandBufferAllocateInfo allocateInfo;
-	allocateInfo.commandPool = _immediateCommandPool;
-	allocateInfo.level = vk::CommandBufferLevel::ePrimary;
-	allocateInfo.commandBufferCount = 1;
-	
-	_immediateCommandBuffer = _device.allocateCommandBuffers(allocateInfo).front();
+	_immediateCommandBuffer = VKCommandBuffer::create(*this);
 }

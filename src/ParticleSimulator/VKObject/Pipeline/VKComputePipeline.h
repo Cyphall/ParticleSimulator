@@ -6,19 +6,33 @@
 #include <optional>
 #include <vulkan/vulkan.hpp>
 
-class VKPipelineLayoutInfo;
+template<typename T>
+class VKDynamic;
+class VKSwapchain;
+class VKPipelineLayout;
 
 class VKComputePipeline : public VKPipeline
 {
 public:
-	VKComputePipeline(const std::filesystem::path& computeShaderFile, const VKPipelineLayoutInfo& descriptorLayout);
+	static VKPtr<VKComputePipeline> create(
+		VKContext& context,
+		const std::filesystem::path& computeShaderFile,
+		const VKPtr<VKPipelineLayout>& pipelineLayout);
+	static std::unique_ptr<VKDynamic<VKComputePipeline>> createDynamic(
+		VKContext& context,
+		VKSwapchain& swapchain,
+		const std::filesystem::path& computeShaderFile,
+		const VKPtr<VKPipelineLayout>& pipelineLayout);
 	
 	~VKComputePipeline() override;
 	
-protected:
 	vk::PipelineBindPoint getPipelineType() override;
 
 private:
-	void createPipelineLayout(const VKPipelineLayoutInfo& descriptorLayout);
+	VKComputePipeline(
+		VKContext& context,
+		const std::filesystem::path& computeShaderFile,
+		const VKPtr<VKPipelineLayout>& pipelineLayout);
+	
 	void createPipeline(const std::filesystem::path& computeShaderFile);
 };

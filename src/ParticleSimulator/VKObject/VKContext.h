@@ -1,15 +1,23 @@
 #pragma once
 
+#include <ParticleSimulator/VKObject/VKPtr.h>
+
 #include <vector>
 #include <vulkan/vulkan.hpp>
 #include <vk_mem_alloc.hpp>
 #include <functional>
+#include <filesystem>
+#include <glm/glm.hpp>
 
 struct GLFWwindow;
+class VKQueue;
+class VKCommandBuffer;
 
 class VKContext
 {
 public:
+	static std::unique_ptr<VKContext> create(GLFWwindow* window);
+	
 	struct SwapChainSupportDetails
 	{
 		vk::SurfaceCapabilitiesKHR capabilities;
@@ -17,15 +25,13 @@ public:
 		std::vector<vk::PresentModeKHR> presentModes;
 	};
 	
-	explicit VKContext(GLFWwindow* window);
 	~VKContext();
 	
 	vk::Instance getInstance();
 	vk::SurfaceKHR getSurface();
 	vk::PhysicalDevice getPhysicalDevice();
 	vk::Device getDevice();
-	uint32_t getMainQueueFamily();
-	vk::Queue getMainQueue();
+	VKQueue& getQueue();
 	
 	GLFWwindow* getWindow();
 	
@@ -33,7 +39,7 @@ public:
 	
 	vma::Allocator getVmaAllocator();
 	
-	void executeImmediate(std::function<void(vk::CommandBuffer)>&& function);
+	void executeImmediate(std::function<void(const VKPtr<VKCommandBuffer>& commandBuffer)>&& function);
 
 private:
 	std::vector<const char*> _instanceExtensions;
@@ -47,14 +53,13 @@ private:
 	vk::DebugUtilsMessengerEXT _messenger;
 	vk::SurfaceKHR _surface;
 	vk::PhysicalDevice _physicalDevice;
-	uint32_t _mainQueueFamily;
-	vk::Queue _mainQueue;
+	std::unique_ptr<VKQueue> _queue;
 	vk::Device _device;
 	
 	vma::Allocator _vmaAllocator;
-	vk::Fence _immediateFence;
-	vk::CommandPool _immediateCommandPool;
-	vk::CommandBuffer _immediateCommandBuffer;
+	VKPtr<VKCommandBuffer> _immediateCommandBuffer;
+	
+	explicit VKContext(GLFWwindow* window);
 	
 	int calculateDeviceScore(const vk::PhysicalDevice& device) const;
 	bool checkDeviceExtensionSupport(const vk::PhysicalDevice& device) const;
@@ -71,11 +76,9 @@ private:
 	void createMessenger();
 	void createSurface();
 	void selectPhysicalDevice();
-	void selectQueueFamilies();
+	uint32_t findSuitableQueueFamily();
 	void createLogicalDevice();
 	
 	void createVmaAllocator();
-	void createImmediateFence();
-	void createImmediateCommandPool();
 	void createImmediateCommandBuffer();
 };

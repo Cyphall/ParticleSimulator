@@ -1,16 +1,19 @@
 #pragma once
 
+#include <ParticleSimulator/VKObject/VKPtr.h>
 #include <ParticleSimulator/Rendering/ParticleStructs.h>
 
 #include <vulkan/vulkan.hpp>
 
 class Camera;
-template<typename T>
+template<typename>
 class VKBuffer;
 class VKImageBase;
 class VKDescriptorSetLayout;
 class VKDescriptorSet;
+class VKPipelineLayout;
 class VKGraphicsPipeline;
+class VKCommandBuffer;
 
 class ParticleViewPass
 {
@@ -18,9 +21,9 @@ public:
 	struct RenderInput
 	{
 		Camera* camera = nullptr;
-		VKBuffer<ParticleData>* particlesBuffer = nullptr;
-		uint32_t particleCount;
-		VKImageBase* outputImage = nullptr;
+		const VKPtr<VKBuffer<ParticleData>>* particlesBuffer = nullptr;
+		uint32_t particleCount = 0;
+		VKPtr<VKImageBase> outputImage;
 	};
 	
 	struct RenderOutput
@@ -31,7 +34,7 @@ public:
 	ParticleViewPass();
 	~ParticleViewPass();
 	
-	RenderOutput render(vk::CommandBuffer commandBuffer, const RenderInput& input);
+	RenderOutput render(const VKPtr<VKCommandBuffer>& commandBuffer, const RenderInput& input);
 	
 private:
 	struct PushConstantData
@@ -39,7 +42,9 @@ private:
 		glm::mat4 vp;
 	};
 	
-	std::unique_ptr<VKGraphicsPipeline> _pipeline;
+	VKPtr<VKPipelineLayout> _pipelineLayout;
+	VKPtr<VKGraphicsPipeline> _pipeline;
 	
+	void createPipelineLayout();
 	void createPipeline();
 };

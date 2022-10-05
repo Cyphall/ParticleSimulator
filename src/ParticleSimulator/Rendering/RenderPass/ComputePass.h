@@ -1,15 +1,18 @@
 #pragma once
 
+#include <ParticleSimulator/VKObject/VKPtr.h>
 #include <ParticleSimulator/Rendering/ParticleStructs.h>
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.hpp>
 
-template<typename T>
+template<typename>
 class VKBuffer;
 class VKDescriptorSetLayout;
 class VKDescriptorSet;
+class VKPipelineLayout;
 class VKComputePipeline;
+class VKCommandBuffer;
 
 class ComputePass
 {
@@ -17,8 +20,8 @@ public:
 	struct RenderInput
 	{
 		float deltaTime;
-		VKBuffer<ParticleData>* particlesInputBuffer = nullptr;
-		VKBuffer<ParticleData>* particlesOutputBuffer = nullptr;
+		const VKPtr<VKBuffer<ParticleData>>* particlesInputBuffer = nullptr;
+		const VKPtr<VKBuffer<ParticleData>>* particlesOutputBuffer = nullptr;
 		uint32_t particleCount;
 		bool cursorGravityEnabled;
 		glm::vec2 cursorGravityPos;
@@ -32,7 +35,7 @@ public:
 	ComputePass();
 	~ComputePass();
 	
-	RenderOutput render(vk::CommandBuffer commandBuffer, const RenderInput& input);
+	RenderOutput render(const VKPtr<VKCommandBuffer>& commandBuffer, const RenderInput& input);
 
 private:
 	struct PushConstantData
@@ -44,12 +47,14 @@ private:
 		uint32_t particlesGravityEnabled; // bool
 	};
 	
-	std::unique_ptr<VKDescriptorSetLayout> _particlesDescriptorSetLayout;
-	std::unique_ptr<VKDescriptorSet> _particlesDescriptorSet;
+	VKPtr<VKDescriptorSetLayout> _particlesDescriptorSetLayout;
+	VKPtr<VKDescriptorSet> _particlesDescriptorSet;
 	
-	std::unique_ptr<VKComputePipeline> _pipeline;
+	VKPtr<VKPipelineLayout> _pipelineLayout;
+	VKPtr<VKComputePipeline> _pipeline;
 	
 	void createDescriptorSetsLayout();
 	void createDescriptorSets();
+	void createPipelineLayout();
 	void createPipeline();
 };

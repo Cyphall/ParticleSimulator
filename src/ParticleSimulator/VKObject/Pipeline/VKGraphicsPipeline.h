@@ -3,37 +3,59 @@
 #include <ParticleSimulator/VKObject/Pipeline/VKPipeline.h>
 
 #include <filesystem>
-#include <optional>
 #include <vulkan/vulkan.hpp>
 
+template<typename T>
+class VKDynamic;
+class VKSwapchain;
 class VKPipelineVertexInputLayoutInfo;
-class VKPipelineLayoutInfo;
+class VKPipelineLayout;
 struct VKPipelineViewport;
-class VKImage;
+class VKPipelineAttachmentInfo;
 
 class VKGraphicsPipeline : public VKPipeline
 {
 public:
-	VKGraphicsPipeline(
+	static VKPtr<VKGraphicsPipeline> create(
+		VKContext& context,
 		const std::filesystem::path& vertexShaderFile,
 		const std::filesystem::path& fragmentShaderFile,
 		const VKPipelineVertexInputLayoutInfo& vertexInputLayoutInfo,
 		vk::PrimitiveTopology vertexTopology,
-		const VKPipelineLayoutInfo& pipelineLayoutInfo,
+		const VKPtr<VKPipelineLayout>& pipelineLayout,
 		const VKPipelineViewport& viewport,
-		const VKImage* depthMap);
+		const VKPipelineAttachmentInfo& pipelineAttachmentInfo);
+	static std::unique_ptr<VKDynamic<VKGraphicsPipeline>> createDynamic(
+		VKContext& context,
+		VKSwapchain& swapchain,
+		const std::filesystem::path& vertexShaderFile,
+		const std::filesystem::path& fragmentShaderFile,
+		const VKPipelineVertexInputLayoutInfo& vertexInputLayoutInfo,
+		vk::PrimitiveTopology vertexTopology,
+		const VKPtr<VKPipelineLayout>& pipelineLayout,
+		const VKPipelineViewport& viewport,
+		const VKPipelineAttachmentInfo& pipelineAttachmentInfo);
 	
 	~VKGraphicsPipeline() override;
 	
-protected:
 	vk::PipelineBindPoint getPipelineType() override;
-
+	
 private:
-	void createPipelineLayout(const VKPipelineLayoutInfo& pipelineLayoutInfo);
-	void createPipeline(const std::filesystem::path& vertexShaderFile,
-						const std::filesystem::path& fragmentShaderFile,
-						const VKPipelineVertexInputLayoutInfo& vertexInputLayoutInfo,
-						vk::PrimitiveTopology vertexTopology,
-						const VKPipelineViewport& viewport,
-						const VKImage* depthMap);
+	VKGraphicsPipeline(
+		VKContext& context,
+		const std::filesystem::path& vertexShaderFile,
+		const std::filesystem::path& fragmentShaderFile,
+		const VKPipelineVertexInputLayoutInfo& vertexInputLayoutInfo,
+		vk::PrimitiveTopology vertexTopology,
+		const VKPtr<VKPipelineLayout>& pipelineLayout,
+		const VKPipelineViewport& viewport,
+		const VKPipelineAttachmentInfo& pipelineAttachmentInfo);
+	
+	void createPipeline(
+		const std::filesystem::path& vertexShaderFile,
+		const std::filesystem::path& fragmentShaderFile,
+		const VKPipelineVertexInputLayoutInfo& vertexInputLayoutInfo,
+		vk::PrimitiveTopology vertexTopology,
+		const VKPipelineViewport& viewport,
+		const VKPipelineAttachmentInfo& pipelineAttachmentInfo);
 };

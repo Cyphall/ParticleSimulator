@@ -1,31 +1,31 @@
 #include "ParticleViewPass.h"
 
 #include <ParticleSimulator/RenderContext.h>
-#include <ParticleSimulator/VKObject/Dynamic/VKDynamicBuffer.h>
-#include <ParticleSimulator/Rendering/Renderer.h>
-#include <ParticleSimulator/VKObject/Pipeline/VKPipelineVertexInputLayoutInfo.h>
+#include <ParticleSimulator/VKObject/Buffer/VKBuffer.h>
 #include <ParticleSimulator/VKObject/Pipeline/VKPipelineLayoutInfo.h>
-#include <ParticleSimulator/VKObject/Pipeline/VKGraphicsPipeline.h>
+#include <ParticleSimulator/VKObject/Pipeline/VKPipelineLayout.h>
+#include <ParticleSimulator/VKObject/Pipeline/VKPipelineVertexInputLayoutInfo.h>
 #include <ParticleSimulator/VKObject/Pipeline/VKPipelineViewport.h>
-#include <ParticleSimulator/VKObject/VKDescriptorSetLayoutBuilder.h>
-#include <ParticleSimulator/VKObject/VKDescriptorSet.h>
-#include <ParticleSimulator/VKObject/VKImage.h>
-#include <ParticleSimulator/VKObject/VKSwapchainImage.h>
+#include <ParticleSimulator/VKObject/Pipeline/VKPipelineAttachmentInfo.h>
+#include <ParticleSimulator/VKObject/Pipeline/VKGraphicsPipeline.h>
+#include <ParticleSimulator/VKObject/CommandBuffer/VKCommandBuffer.h>
+#include <ParticleSimulator/VKObject/Image/VKImageBase.h>
 #include <ParticleSimulator/Camera.h>
 
 #include <glm/glm.hpp>
 
 ParticleViewPass::ParticleViewPass()
 {
+	createPipelineLayout();
 	createPipeline();
 }
 
 ParticleViewPass::~ParticleViewPass()
 {
-	_pipeline.reset();
+	
 }
 
-ParticleViewPass::RenderOutput ParticleViewPass::render(vk::CommandBuffer commandBuffer, const ParticleViewPass::RenderInput& input)
+ParticleViewPass::RenderOutput ParticleViewPass::render(const VKPtr<VKCommandBuffer>& commandBuffer, const ParticleViewPass::RenderInput& input)
 {
 	vk::ClearValue colorClearValue;
 	colorClearValue.color.float32[0] = 0.0f;
@@ -45,7 +45,7 @@ ParticleViewPass::RenderOutput ParticleViewPass::render(vk::CommandBuffer comman
 	
 	vk::RenderingInfo renderingInfo;
 	renderingInfo.renderArea.offset = vk::Offset2D(0, 0);
-	renderingInfo.renderArea.extent = input.outputImage->getExtent();
+	renderingInfo.renderArea.extent = vk::Extent2D(input.outputImage->getSize().x, input.outputImage->getSize().y);
 	renderingInfo.layerCount = 1;
 	renderingInfo.viewMask = 0;
 	renderingInfo.colorAttachmentCount = 1;
@@ -53,21 +53,31 @@ ParticleViewPass::RenderOutput ParticleViewPass::render(vk::CommandBuffer comman
 	renderingInfo.pDepthAttachment = nullptr;
 	renderingInfo.pStencilAttachment = nullptr;
 	
-	commandBuffer.beginRendering(renderingInfo);
+	commandBuffer->beginRendering(renderingInfo);
 	
-	commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, _pipeline->getHandle());
+	commandBuffer->bindPipeline(_pipeline);
 	
 	PushConstantData pushConstantData{};
 	pushConstantData.vp = input.camera->getProjection() * input.camera->getView();
-	commandBuffer.pushConstants(_pipeline->getPipelineLayout(), vk::ShaderStageFlagBits::eVertex, 0, sizeof(PushConstantData), &pushConstantData);
+	commandBuffer->pushConstants(vk::ShaderStageFlagBits::eVertex, pushConstantData);
 	
-	commandBuffer.bindVertexBuffers(0, input.particlesBuffer->getHandle(), {0});
+	commandBuffer->bindVertexBuffer(0, *input.particlesBuffer);
 	
-	commandBuffer.draw(input.particleCount, 1, 0, 0);
+	commandBuffer->draw(input.particleCount, 0);
 	
-	commandBuffer.endRendering();
+	commandBuffer->unbindPipeline();
+	
+	commandBuffer->endRendering();
 	
 	return {};
+}
+
+void ParticleViewPass::createPipelineLayout()
+{
+	VKPipelineLayoutInfo pipelineLayoutInfo;
+	pipelineLayoutInfo.registerPushConstantLayout<PushConstantData>(vk::ShaderStageFlagBits::eVertex);
+	
+	_pipelineLayout = VKPipelineLayout::create(*RenderContext::vkContext, pipelineLayoutInfo);
 }
 
 void ParticleViewPass::createPipeline()
@@ -77,22 +87,21 @@ void ParticleViewPass::createPipeline()
 	vertexInputLayoutInfo.defineAttribute(0, 1, vk::Format::eR32G32Sfloat, offsetof(ParticleData, velocity));
 	vertexInputLayoutInfo.defineSlot(0, sizeof(ParticleData), vk::VertexInputRate::eVertex);
 	
-	VKPipelineLayoutInfo pipelineLayoutInfo;
-	pipelineLayoutInfo.registerPushConstantLayout<PushConstantData>(vk::ShaderStageFlagBits::eVertex);
-	
-	vk::Extent2D swapchainExtent = RenderContext::swapchain->getExtent();
-	
 	VKPipelineViewport viewport;
 	viewport.offset = {0, 0};
-	viewport.size = {swapchainExtent.width, swapchainExtent.height};
+	viewport.size = RenderContext::swapchain->getSize();
 	viewport.depthRange = {0.0f, 1.0f};
 	
-	_pipeline = std::make_unique<VKGraphicsPipeline>(
+	VKPipelineAttachmentInfo pipelineAttachmentInfo;
+	pipelineAttachmentInfo.registerColorAttachment(0, RenderContext::swapchain->getFormat());
+	
+	_pipeline = VKGraphicsPipeline::create(
+		*RenderContext::vkContext,
 		"resources/shaders/particleView.vert",
 		"resources/shaders/particleView.frag",
 		vertexInputLayoutInfo,
 		vk::PrimitiveTopology::ePointList,
-		pipelineLayoutInfo,
+		_pipelineLayout,
 		viewport,
-		nullptr);
+		pipelineAttachmentInfo);
 }

@@ -1,41 +1,80 @@
 #include "VKGraphicsPipeline.h"
 
-#include <ParticleSimulator/RenderContext.h>
-#include <ParticleSimulator/VKObject/VKShader.h>
-#include <ParticleSimulator/VKObject/VKSwapchain.h>
 #include <ParticleSimulator/VKObject/VKContext.h>
+#include <ParticleSimulator/VKObject/VKDynamic.h>
 #include <ParticleSimulator/VKObject/Pipeline/VKPipelineVertexInputLayoutInfo.h>
-#include <ParticleSimulator/VKObject/Pipeline/VKPipelineLayoutInfo.h>
+#include <ParticleSimulator/VKObject/Pipeline/VKPipelineLayout.h>
 #include <ParticleSimulator/VKObject/Pipeline/VKPipelineViewport.h>
-#include <ParticleSimulator/VKObject/VKImage.h>
+#include <ParticleSimulator/VKObject/Pipeline/VKPipelineAttachmentInfo.h>
+#include <ParticleSimulator/VKObject/Shader/VKShader.h>
 
-VKGraphicsPipeline::VKGraphicsPipeline(const std::filesystem::path& vertexShaderFile,
-									   const std::filesystem::path& fragmentShaderFile,
-									   const VKPipelineVertexInputLayoutInfo& vertexInputLayoutInfo,
-									   vk::PrimitiveTopology vertexTopology,
-									   const VKPipelineLayoutInfo& pipelineLayoutInfo,
-									   const VKPipelineViewport& viewport,
-									   const VKImage* depthMap)
+VKPtr<VKGraphicsPipeline> VKGraphicsPipeline::create(
+	VKContext& context,
+	const std::filesystem::path& vertexShaderFile,
+	const std::filesystem::path& fragmentShaderFile,
+	const VKPipelineVertexInputLayoutInfo& vertexInputLayoutInfo,
+	vk::PrimitiveTopology vertexTopology,
+	const VKPtr<VKPipelineLayout>& pipelineLayout,
+	const VKPipelineViewport& viewport,
+	const VKPipelineAttachmentInfo& pipelineAttachmentInfo)
 {
-	createPipelineLayout(pipelineLayoutInfo);
+	return VKPtr<VKGraphicsPipeline>(new VKGraphicsPipeline(
+		context,
+		vertexShaderFile,
+		fragmentShaderFile,
+		vertexInputLayoutInfo,
+		vertexTopology,
+		pipelineLayout,
+		viewport,
+		pipelineAttachmentInfo));
+}
+
+std::unique_ptr<VKDynamic<VKGraphicsPipeline>> VKGraphicsPipeline::createDynamic(
+	VKContext& context,
+	VKSwapchain& swapchain,
+	const std::filesystem::path& vertexShaderFile,
+	const std::filesystem::path& fragmentShaderFile,
+	const VKPipelineVertexInputLayoutInfo& vertexInputLayoutInfo,
+	vk::PrimitiveTopology vertexTopology,
+	const VKPtr<VKPipelineLayout>& pipelineLayout,
+	const VKPipelineViewport& viewport,
+	const VKPipelineAttachmentInfo& pipelineAttachmentInfo)
+{
+	return std::unique_ptr<VKDynamic<VKGraphicsPipeline>>(new VKDynamic<VKGraphicsPipeline>(
+		context,
+		swapchain,
+		vertexShaderFile,
+		fragmentShaderFile,
+		vertexInputLayoutInfo,
+		vertexTopology,
+		pipelineLayout,
+		viewport,
+		pipelineAttachmentInfo));
+}
+
+VKGraphicsPipeline::VKGraphicsPipeline(
+	VKContext& context,
+	const std::filesystem::path& vertexShaderFile,
+	const std::filesystem::path& fragmentShaderFile,
+	const VKPipelineVertexInputLayoutInfo& vertexInputLayoutInfo,
+	vk::PrimitiveTopology vertexTopology,
+	const VKPtr<VKPipelineLayout>& pipelineLayout,
+	const VKPipelineViewport& viewport,
+	const VKPipelineAttachmentInfo& pipelineAttachmentInfo):
+	VKPipeline(context, pipelineLayout)
+{
 	createPipeline(
 		vertexShaderFile,
 		fragmentShaderFile,
 		vertexInputLayoutInfo,
 		vertexTopology,
 		viewport,
-		depthMap);
+		pipelineAttachmentInfo);
 }
 
 VKGraphicsPipeline::~VKGraphicsPipeline()
 {
-	RenderContext::vkContext->getDevice().destroyPipelineLayout(_pipelineLayout);
-	RenderContext::vkContext->getDevice().destroyPipeline(_pipeline);
-}
-
-void VKGraphicsPipeline::createPipelineLayout(const VKPipelineLayoutInfo& pipelineLayoutInfo)
-{
-	_pipelineLayout = RenderContext::vkContext->getDevice().createPipelineLayout(pipelineLayoutInfo.get());
+	_context.getDevice().destroyPipeline(_pipeline);
 }
 
 void VKGraphicsPipeline::createPipeline(
@@ -44,19 +83,19 @@ void VKGraphicsPipeline::createPipeline(
 	const VKPipelineVertexInputLayoutInfo& vertexInputLayoutInfo,
 	vk::PrimitiveTopology vertexTopology,
 	const VKPipelineViewport& viewport,
-	const VKImage* depthMap)
+	const VKPipelineAttachmentInfo& pipelineAttachmentInfo)
 {
-	VKShader vertexShader(vertexShaderFile);
-	VKShader fragmentShader(fragmentShaderFile);
+	VKPtr<VKShader> vertexShader = VKShader::create(_context, vertexShaderFile);
+	VKPtr<VKShader> fragmentShader = VKShader::create(_context, fragmentShaderFile);
 	
 	vk::PipelineShaderStageCreateInfo shaderCreateInfos[2];
 	
 	shaderCreateInfos[0].stage = vk::ShaderStageFlagBits::eVertex;
-	shaderCreateInfos[0].module = vertexShader.getHandle();
+	shaderCreateInfos[0].module = vertexShader->getHandle();
 	shaderCreateInfos[0].pName = "main";
 	
 	shaderCreateInfos[1].stage = vk::ShaderStageFlagBits::eFragment;
-	shaderCreateInfos[1].module = fragmentShader.getHandle();
+	shaderCreateInfos[1].module = fragmentShader->getHandle();
 	shaderCreateInfos[1].pName = "main";
 	
 	vk::PipelineVertexInputStateCreateInfo vertexInputState = vertexInputLayoutInfo.get();
@@ -125,17 +164,10 @@ void VKGraphicsPipeline::createPipeline(
 	colorBlending.blendConstants[2] = 0.0f; // Optional
 	colorBlending.blendConstants[3] = 0.0f; // Optional
 	
-	vk::Format swapchainImageFormat = RenderContext::swapchain->getFormat();
-	
-	vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo;
-	pipelineRenderingCreateInfo.viewMask = 0;
-	pipelineRenderingCreateInfo.colorAttachmentCount = 1;
-	pipelineRenderingCreateInfo.pColorAttachmentFormats = &swapchainImageFormat;
-	pipelineRenderingCreateInfo.depthAttachmentFormat = depthMap != nullptr ? depthMap->getFormat() : vk::Format::eUndefined;
-	pipelineRenderingCreateInfo.stencilAttachmentFormat = vk::Format::eUndefined;
+	vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo = pipelineAttachmentInfo.get();
 	
 	vk::PipelineDepthStencilStateCreateInfo depthState;
-	if (depthMap != nullptr)
+	if (pipelineRenderingCreateInfo.depthAttachmentFormat != vk::Format::eUndefined)
 	{
 		depthState.depthTestEnable = true;
 		depthState.depthWriteEnable = true;
@@ -164,14 +196,14 @@ void VKGraphicsPipeline::createPipeline(
 	pipelineCreateInfo.pDepthStencilState = &depthState; // Optional
 	pipelineCreateInfo.pColorBlendState = &colorBlending;
 	pipelineCreateInfo.pDynamicState = nullptr; // Optional
-	pipelineCreateInfo.layout = _pipelineLayout;
+	pipelineCreateInfo.layout = _pipelineLayout->getHandle();
 	pipelineCreateInfo.renderPass = nullptr;
 	pipelineCreateInfo.subpass = 0;
 	pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
 	pipelineCreateInfo.basePipelineIndex = -1; // Optional
 	pipelineCreateInfo.pNext = &pipelineRenderingCreateInfo;
 	
-	_pipeline = RenderContext::vkContext->getDevice().createGraphicsPipeline(VK_NULL_HANDLE, pipelineCreateInfo).value;
+	_pipeline = _context.getDevice().createGraphicsPipeline(VK_NULL_HANDLE, pipelineCreateInfo).value;
 }
 
 vk::PipelineBindPoint VKGraphicsPipeline::getPipelineType()

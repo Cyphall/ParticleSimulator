@@ -4,7 +4,7 @@
 
 struct VKPipelineViewport
 {
-	glm::ivec2 offset = {};
-	glm::ivec2 size = {};
+	glm::uvec2 offset = {};
+	glm::uvec2 size = {};
 	glm::vec2 depthRange = {};
 };
