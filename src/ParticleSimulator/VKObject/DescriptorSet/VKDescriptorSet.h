@@ -3,6 +3,7 @@
 #include <ParticleSimulator/VKObject/VKObject.h>
 
 #include <vulkan/vulkan.hpp>
+#include <unordered_map>
 
 template<typename T>
 class VKDynamic;
