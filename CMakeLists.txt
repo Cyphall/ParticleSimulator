@@ -25,6 +25,8 @@ target_compile_definitions(ParticleSimulator PRIVATE VULKAN_HPP_NO_SETTERS)
 target_compile_definitions(ParticleSimulator PRIVATE VULKAN_HPP_NO_NODISCARD_WARNINGS)
 target_compile_definitions(ParticleSimulator PRIVATE VULKAN_HPP_NO_SMART_HANDLE)
 
+target_include_directories(ParticleSimulator PRIVATE "src")
+
 find_package(Vulkan REQUIRED)
 target_link_libraries(ParticleSimulator PRIVATE Vulkan::Headers)
 
@@ -34,8 +36,11 @@ target_link_libraries(ParticleSimulator PRIVATE glfw)
 find_package(glm CONFIG REQUIRED)
 target_link_libraries(ParticleSimulator PRIVATE glm::glm)
 
-target_include_directories(ParticleSimulator PRIVATE "src")
-target_include_directories(ParticleSimulator SYSTEM PRIVATE "vendor/VulkanMemoryAllocator-Hpp/include")
+add_subdirectory("vendor/VulkanMemoryAllocator/66afe099f1cf1f79c270471e9c0f02139072057d")
+target_link_libraries(ParticleSimulator PRIVATE VulkanMemoryAllocator)
+
+add_subdirectory("vendor/VulkanMemoryAllocator-Hpp/f915eb0ef170560661891afaedff4b93ef05d723")
+target_link_libraries(ParticleSimulator PRIVATE VulkanMemoryAllocator-Hpp)
 
 add_custom_target(copy_resources
 		COMMAND python "${PROJECT_SOURCE_DIR}/copy_resources.py" "${PROJECT_SOURCE_DIR}/resources" "${PROJECT_BINARY_DIR}/resources" "${Vulkan_GLSLC_EXECUTABLE}")
