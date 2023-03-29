@@ -10,10 +10,12 @@ import subprocess
 def copy_file(input_path, output_path):
 	shutil.copyfile(input_path, output_path)
 
+
 def compile_shader(input_path, output_path):
 	result = subprocess.run([glslc_path, "-o", output_path, "--target-env=vulkan1.3", "-O", input_path])
-	if (result.returncode != 0):
+	if result.returncode != 0:
 		sys.exit(1)
+
 
 def process_file(input_path: str):
 	ext = posixpath.splitext(input_path)[1]
