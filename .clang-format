@@ -36,7 +36,7 @@ AllowShortCaseLabelsOnASingleLine: true
 AllowShortEnumsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: Never
-AllowShortLambdasOnASingleLine: Empty
+AllowShortLambdasOnASingleLine: All
 AllowShortLoopsOnASingleLine: false
 AlwaysBreakAfterReturnType: None
 AlwaysBreakBeforeMultilineStrings: true
@@ -56,7 +56,7 @@ BraceWrapping:
   AfterExternBlock: true
   BeforeCatch: true
   BeforeElse: true
-  BeforeLambdaBody: true
+  BeforeLambdaBody: false
   BeforeWhile: true
   IndentBraces: false
   SplitEmptyFunction: false
@@ -72,6 +72,7 @@ BreakBeforeTernaryOperators: false
 BreakConstructorInitializers: AfterColon
 BreakInheritanceList: AfterColon
 BreakStringLiterals: false
+CommentPragmas: "^(TODO|FIXME):.*"
 ColumnLimit: 0
 CompactNamespaces: false
 ConstructorInitializerIndentWidth: 4
@@ -96,8 +97,8 @@ IndentPPDirectives: AfterHash
 IndentRequiresClause: false
 IndentWidth: 4
 IndentWrappedFunctionNames: false
-InsertBraces: false
-InsertNewlineAtEOF: false
+InsertBraces: true
+InsertNewlineAtEOF: true
 IntegerLiteralSeparator:
   Binary: 0
   Decimal: 0
@@ -108,7 +109,7 @@ LambdaBodyIndentation: Signature
 Language: Cpp
 LineEnding: LF
 MaxEmptyLinesToKeep: 2
-NamespaceIndentation: All
+NamespaceIndentation: None
 PPIndentWidth: -1
 PackConstructorInitializers: Never
 PointerAlignment: Left

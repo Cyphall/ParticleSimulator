@@ -1,16 +1,7 @@
 {
-  "builtin-baseline": "120deac3062162151622ca4860575a33844ba10b",
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "dependencies": [
     "glfw3",
-    "glm",
-    "vulkan-headers",
-    "vulkan-memory-allocator",
-    "cmakerc",
-    {
-      "name": "glslang",
-      "features": [
-        "tools"
-      ]
-    }
+    "cyphgpu"
   ]
 }

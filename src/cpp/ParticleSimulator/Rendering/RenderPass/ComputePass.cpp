@@ -1,75 +1,63 @@
 #include "ComputePass.h"
 
-#include <ParticleSimulator/RenderContext.h>
-#include <ParticleSimulator/VKObject/Buffer/VKBuffer.h>
-#include <ParticleSimulator/VKObject/Pipeline/VKPipelineLayoutInfo.h>
-#include <ParticleSimulator/VKObject/Pipeline/VKPipelineLayout.h>
-#include <ParticleSimulator/VKObject/Pipeline/VKComputePipeline.h>
-#include <ParticleSimulator/VKObject/DescriptorSet/VKDescriptorSetLayoutInfo.h>
-#include <ParticleSimulator/VKObject/DescriptorSet/VKDescriptorSetLayout.h>
-#include <ParticleSimulator/VKObject/DescriptorSet/VKDescriptorSet.h>
-#include <ParticleSimulator/VKObject/CommandBuffer/VKCommandBuffer.h>
+#include <ParticleSimulator/Rendering/ParticleData.h>
 
-ComputePass::ComputePass()
+#include <CyphGPU/ComputePassContext.hpp>
+#include <CyphGPU/ComputeShaderState.hpp>
+#include <CyphGPU/ShaderTypes.hpp>
+
+using namespace cgpu::shader_types;
+
+ComputePass::ComputePass(const cgpu::DeviceSessionPtr& deviceSession):
+	_deviceSession{deviceSession}
 {
-	createDescriptorSetsLayout();
-	createDescriptorSets();
-	createPipelineLayout();
-	createPipeline();
+	createShaderState();
 }
 
 ComputePass::~ComputePass() {}
 
-ComputePass::RenderOutput ComputePass::render(const VKPtr<VKCommandBuffer>& commandBuffer, const ComputePass::RenderInput& input)
+ComputePass::RenderOutput ComputePass::render(cgpu::CommandRecorder& rec, const RenderInput& input)
 {
-	commandBuffer->bindPipeline(_pipeline);
+	rec.computePass({
+		.callback = [&](cgpu::ComputePassContext& ctx) {
+			ctx.bindPipelineStates(_computeShaderState);
 
-	_particlesDescriptorSet->bindBuffer(0, *input.particlesInputBuffer);
-	_particlesDescriptorSet->bindBuffer(1, *input.particlesOutputBuffer);
-	commandBuffer->bindDescriptorSet(0, _particlesDescriptorSet);
+			struct
+			{
+				float u_deltaTime;
+				uint u_particleCount;
+				float2 u_cursorGravityPos;
+				bool u_cursorGravityEnabled;
+				bool u_particlesGravityEnabled;
+				ParticleData* u_inputParticles;
+				ParticleData* u_outputParticles;
+			} parameters{};
 
-	PushConstantData pushConstantData{};
-	pushConstantData.deltaTime = input.deltaTime;
-	pushConstantData.particleCount = input.particleCount;
-	pushConstantData.cursorGravityEnabled = input.cursorGravityEnabled;
-	pushConstantData.cursorGravityPos = input.cursorGravityPos;
-	pushConstantData.particlesGravityEnabled = input.particlesGravityEnabled;
-	commandBuffer->pushConstants(vk::ShaderStageFlagBits::eCompute, pushConstantData);
+			parameters.u_deltaTime = input.deltaTime;
+			parameters.u_particleCount = input.particleCount;
+			parameters.u_cursorGravityEnabled = input.cursorGravityEnabled;
+			parameters.u_cursorGravityPos = input.cursorGravityPos;
+			parameters.u_particlesGravityEnabled = input.particlesGravityEnabled;
+			parameters.u_inputParticles = ctx.getBufferDevicePtr<ParticleData>(input.particlesInputBuffer, cgpu::CommandRecorder::ResourceAccess::eReadonly);
+			parameters.u_outputParticles = ctx.getBufferDevicePtr<ParticleData>(input.particlesOutputBuffer, cgpu::CommandRecorder::ResourceAccess::eReadWrite);
 
-	commandBuffer->dispatch({std::max<uint32_t>(std::ceil(input.particleCount / 1024.0), 1), 1, 1});
+			ctx.pushParameters(0, parameters);
 
-	commandBuffer->unbindPipeline();
+			ctx.dispatch({cgpu::alignUp(input.particleCount, 1024) / 1024, 1, 1});
+		},
+	});
 
 	return {};
 }
 
-void ComputePass::createDescriptorSetsLayout()
+void ComputePass::createShaderState()
 {
-	VKDescriptorSetLayoutInfo descriptorSetLayoutInfo;
-	descriptorSetLayoutInfo.registerBinding(0, vk::DescriptorType::eStorageBuffer, 1);
-	descriptorSetLayoutInfo.registerBinding(1, vk::DescriptorType::eStorageBuffer, 1);
-
-	_particlesDescriptorSetLayout = VKDescriptorSetLayout::create(*RenderContext::vkContext, descriptorSetLayoutInfo);
-}
-
-void ComputePass::createDescriptorSets()
-{
-	_particlesDescriptorSet = VKDescriptorSet::create(*RenderContext::vkContext, _particlesDescriptorSetLayout);
-}
-
-void ComputePass::createPipelineLayout()
-{
-	VKPipelineLayoutInfo pipelineLayoutInfo;
-	pipelineLayoutInfo.registerDescriptorSetLayout(_particlesDescriptorSetLayout);
-	pipelineLayoutInfo.registerPushConstantLayout<PushConstantData>(vk::ShaderStageFlagBits::eCompute);
-
-	_pipelineLayout = VKPipelineLayout::create(*RenderContext::vkContext, pipelineLayoutInfo);
-}
-
-void ComputePass::createPipeline()
-{
-	_pipeline = VKComputePipeline::create(
-		*RenderContext::vkContext,
-		"simulateParticles.comp",
-		_pipelineLayout);
+	_computeShaderState = cgpu::ComputeShaderState::create(
+		_deviceSession,
+		{
+			.compute_shader = {
+				.source = "simulateParticles.slang",
+			},
+		}
+	);
 }

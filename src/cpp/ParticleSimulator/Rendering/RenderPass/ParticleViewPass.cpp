@@ -1,104 +1,98 @@
 #include "ParticleViewPass.h"
 
-#include <ParticleSimulator/RenderContext.h>
-#include <ParticleSimulator/VKObject/Buffer/VKBuffer.h>
-#include <ParticleSimulator/VKObject/Pipeline/VKPipelineLayoutInfo.h>
-#include <ParticleSimulator/VKObject/Pipeline/VKPipelineLayout.h>
-#include <ParticleSimulator/VKObject/Pipeline/VKPipelineVertexInputLayoutInfo.h>
-#include <ParticleSimulator/VKObject/Pipeline/VKPipelineViewport.h>
-#include <ParticleSimulator/VKObject/Pipeline/VKPipelineAttachmentInfo.h>
-#include <ParticleSimulator/VKObject/Pipeline/VKGraphicsPipeline.h>
-#include <ParticleSimulator/VKObject/CommandBuffer/VKCommandBuffer.h>
-#include <ParticleSimulator/VKObject/Image/VKImageBase.h>
 #include <ParticleSimulator/Camera.h>
+#include <ParticleSimulator/Rendering/ParticleData.h>
 
+#include <CyphGPU/FragmentOutputState.hpp>
+#include <CyphGPU/FragmentShaderState.hpp>
+#include <CyphGPU/GraphicsPassContext.hpp>
+#include <CyphGPU/PreRasterizationShaderState.hpp>
+#include <CyphGPU/ShaderTypes.hpp>
+#include <CyphGPU/VertexInputState.hpp>
 #include <glm/glm.hpp>
 
-ParticleViewPass::ParticleViewPass()
+using namespace cgpu::shader_types;
+
+ParticleViewPass::ParticleViewPass(const cgpu::DeviceSessionPtr& deviceSession, vk::Format format):
+	_deviceSession{deviceSession}
 {
-	createPipelineLayout();
-	createPipeline();
+	createShaderStates(format);
 }
 
 ParticleViewPass::~ParticleViewPass() {}
 
-ParticleViewPass::RenderOutput ParticleViewPass::render(const VKPtr<VKCommandBuffer>& commandBuffer, const ParticleViewPass::RenderInput& input)
+ParticleViewPass::RenderOutput ParticleViewPass::render(cgpu::CommandRecorder& rec, const RenderInput& input)
 {
-	vk::ClearValue colorClearValue;
-	colorClearValue.color.float32[0] = 0.0f;
-	colorClearValue.color.float32[1] = 0.0f;
-	colorClearValue.color.float32[2] = 0.0f;
-	colorClearValue.color.float32[3] = 1.0f;
+	rec.graphicsPass({
+		.color_attachments = {{{
+			.image = input.outputImage,
+			.load_op = vk::AttachmentLoadOp::eClear,
+			.store_op = vk::AttachmentStoreOp::eStore,
+			.clear_color_value = glm::vec4{0.0f, 0.0f, 0.0f, 1.0f},
+		}}},
+		.callback = [&](cgpu::GraphicsPassContext& ctx) {
+			ctx.bindPipelineStates(
+				_vertexInputState,
+				_preRasterizationShaderState,
+				_fragmentShaderState,
+				_fragmentOutputState
+			);
 
-	vk::RenderingAttachmentInfo colorAttachment;
-	colorAttachment.imageView = input.outputImage->getView();
-	colorAttachment.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
-	colorAttachment.resolveMode = vk::ResolveModeFlagBits::eNone;
-	colorAttachment.resolveImageView = nullptr;
-	colorAttachment.resolveImageLayout = vk::ImageLayout::eUndefined;
-	colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
-	colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-	colorAttachment.clearValue = colorClearValue;
+			struct
+			{
+				float4x4 u_viewProjectionMatrix;
+				uint u_particleCount;
+				ParticleData* u_inputParticles;
+			} parameters{};
 
-	vk::RenderingInfo renderingInfo;
-	renderingInfo.renderArea.offset = vk::Offset2D(0, 0);
-	renderingInfo.renderArea.extent = vk::Extent2D(input.outputImage->getSize().x, input.outputImage->getSize().y);
-	renderingInfo.layerCount = 1;
-	renderingInfo.viewMask = 0;
-	renderingInfo.colorAttachmentCount = 1;
-	renderingInfo.pColorAttachments = &colorAttachment;
-	renderingInfo.pDepthAttachment = nullptr;
-	renderingInfo.pStencilAttachment = nullptr;
+			parameters.u_viewProjectionMatrix = input.camera->getProjection() * input.camera->getView();
+			parameters.u_particleCount = input.particleCount;
+			parameters.u_inputParticles = ctx.getBufferDevicePtr<ParticleData>(input.particlesBuffer, cgpu::CommandRecorder::ResourceAccess::eReadonly);
 
-	commandBuffer->beginRendering(renderingInfo);
+			ctx.pushParameters(0, parameters);
 
-	commandBuffer->bindPipeline(_pipeline);
-
-	PushConstantData pushConstantData{};
-	pushConstantData.vp = input.camera->getProjection() * input.camera->getView();
-	commandBuffer->pushConstants(vk::ShaderStageFlagBits::eVertex, pushConstantData);
-
-	commandBuffer->bindVertexBuffer(0, *input.particlesBuffer);
-
-	commandBuffer->draw(input.particleCount, 0);
-
-	commandBuffer->unbindPipeline();
-
-	commandBuffer->endRendering();
+			ctx.draw(input.particleCount, 1, 0, 0);
+		},
+	});
 
 	return {};
 }
 
-void ParticleViewPass::createPipelineLayout()
+void ParticleViewPass::createShaderStates(vk::Format format)
 {
-	VKPipelineLayoutInfo pipelineLayoutInfo;
-	pipelineLayoutInfo.registerPushConstantLayout<PushConstantData>(vk::ShaderStageFlagBits::eVertex);
+	_vertexInputState = cgpu::VertexInputState::create(
+		_deviceSession,
+		{
+			.topology = vk::PrimitiveTopology::ePointList,
+		}
+	);
 
-	_pipelineLayout = VKPipelineLayout::create(*RenderContext::vkContext, pipelineLayoutInfo);
-}
+	_preRasterizationShaderState = cgpu::PreRasterizationShaderState::create(
+		_deviceSession,
+		{
+			.vertex_shader = {
+				.source = "particleView.slang",
+			},
+		}
+	);
 
-void ParticleViewPass::createPipeline()
-{
-	VKPipelineVertexInputLayoutInfo vertexInputLayoutInfo;
-	vertexInputLayoutInfo.defineAttribute(0, 0, vk::Format::eR32G32Sfloat, offsetof(ParticleData, position));
-	vertexInputLayoutInfo.defineAttribute(0, 1, vk::Format::eR32G32Sfloat, offsetof(ParticleData, velocity));
-	vertexInputLayoutInfo.defineSlot(0, sizeof(ParticleData), vk::VertexInputRate::eVertex);
+	_fragmentShaderState = cgpu::FragmentShaderState::create(
+		_deviceSession,
+		{
+			.fragment_shader = {{
+				.source = "particleView.slang",
+			}},
+		}
+	);
 
-	VKPipelineViewport viewport;
-	viewport.offset = {0, 0};
-	viewport.size = RenderContext::swapchain->getSize();
-	viewport.depthRange = {0.0f, 1.0f};
-
-	VKPipelineAttachmentInfo pipelineAttachmentInfo;
-	pipelineAttachmentInfo.registerColorAttachment(0, RenderContext::swapchain->getFormat());
-
-	_pipeline = VKGraphicsPipeline::create(
-		*RenderContext::vkContext,
-		"particleView.vert",
-		"particleView.frag",
-		vertexInputLayoutInfo,
-		vk::PrimitiveTopology::ePointList,
-		_pipelineLayout,
-		viewport,
-		pipelineAttachmentInfo);
+	_fragmentOutputState = cgpu::FragmentOutputState::create(
+		_deviceSession,
+		{
+			.color_attachments = {
+				{
+					.format = format,
+				}
+			},
+		}
+	);
 }

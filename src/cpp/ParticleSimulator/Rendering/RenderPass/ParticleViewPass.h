@@ -1,19 +1,10 @@
 #pragma once
 
-#include <ParticleSimulator/VKObject/VKPtr.h>
-#include <ParticleSimulator/Rendering/ParticleStructs.h>
-
+#include <CyphGPU/CommandRecorder.hpp>
+#include <CyphGPU/fwd.hpp>
 #include <vulkan/vulkan.hpp>
 
 class Camera;
-template<typename>
-class VKBuffer;
-class VKImageBase;
-class VKDescriptorSetLayout;
-class VKDescriptorSet;
-class VKPipelineLayout;
-class VKGraphicsPipeline;
-class VKCommandBuffer;
 
 class ParticleViewPass
 {
@@ -21,27 +12,26 @@ public:
 	struct RenderInput
 	{
 		Camera* camera = nullptr;
-		const VKPtr<VKBuffer<ParticleData>>* particlesBuffer = nullptr;
-		uint32_t particleCount = 0;
-		VKPtr<VKImageBase> outputImage;
+		cgpu::BufferPtr particlesBuffer;
+		uint32_t particleCount;
+		cgpu::ImagePtr outputImage;
 	};
 
-	struct RenderOutput {};
+	struct RenderOutput
+	{};
 
-	ParticleViewPass();
+	explicit ParticleViewPass(const cgpu::DeviceSessionPtr& deviceSession, vk::Format format);
 	~ParticleViewPass();
 
-	RenderOutput render(const VKPtr<VKCommandBuffer>& commandBuffer, const RenderInput& input);
+	RenderOutput render(cgpu::CommandRecorder& rec, const RenderInput& input);
 
 private:
-	struct PushConstantData
-	{
-		glm::mat4 vp;
-	};
+	cgpu::DeviceSessionPtr _deviceSession;
 
-	VKPtr<VKPipelineLayout> _pipelineLayout;
-	VKPtr<VKGraphicsPipeline> _pipeline;
+	cgpu::VertexInputStatePtr _vertexInputState;
+	cgpu::PreRasterizationShaderStatePtr _preRasterizationShaderState;
+	cgpu::FragmentShaderStatePtr _fragmentShaderState;
+	cgpu::FragmentOutputStatePtr _fragmentOutputState;
 
-	void createPipelineLayout();
-	void createPipeline();
+	void createShaderStates(vk::Format format);
 };

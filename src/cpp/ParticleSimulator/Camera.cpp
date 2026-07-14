@@ -1,13 +1,11 @@
 #include "Camera.h"
 
-#include <ParticleSimulator/Helper/MathHelper.h>
-#include <ParticleSimulator/RenderContext.h>
-#include <ParticleSimulator/VKObject/VKContext.h>
-
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
 
-Camera::Camera(glm::vec3 position): _position(position) {}
+Camera::Camera(glm::vec3 position):
+	_position(position)
+{}
 
 void Camera::update(float deltaTime)
 {
@@ -43,14 +41,18 @@ void Camera::update(float deltaTime)
 glm::mat4 Camera::getView() const
 {
 	if (_viewChanged)
+	{
 		recalculateView();
+	}
 	return _view;
 }
 
 glm::mat4 Camera::getProjection() const
 {
 	if (_projectionChanged)
+	{
 		recalculateProjection();
+	}
 	return _projection;
 }
 
