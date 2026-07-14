@@ -132,6 +132,8 @@ void Renderer::draw(Camera& camera, float deltaTime, const cgpu::ImagePtr& outpu
 
 	rec.submit();
 
+	_cmdCtx.finish();
+
 	std::swap(_particlesBufferSrc, _particlesBufferDst);
 
 	_previousMouseWorldPos = mouseWorldPos;
