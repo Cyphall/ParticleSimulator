@@ -50,6 +50,8 @@ void Renderer::draw(Camera& camera, float deltaTime, const cgpu::ImagePtr& outpu
 	{
 		if (leftClickPressed)
 		{
+			_deviceSession->waitIdle();
+
 			uint32_t addedParticleCount = (MAX_PARTICLES / 5) * deltaTime;
 
 			ParticleData* ptr = _particlesBufferSrc->getHostPtr<ParticleData>();
@@ -129,8 +131,6 @@ void Renderer::draw(Camera& camera, float deltaTime, const cgpu::ImagePtr& outpu
 #endif
 
 	rec.submit();
-
-	_deviceSession->waitIdle();
 
 	std::swap(_particlesBufferSrc, _particlesBufferDst);
 
