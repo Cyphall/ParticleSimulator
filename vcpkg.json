@@ -3,5 +3,18 @@
 	"dependencies": [
 		"glfw3",
 		"cyphgpu"
-	]
+	],
+	"features": {
+		"tracy": {
+			"description": "Enable Tracy integration",
+			"dependencies": [
+				{
+					"name": "cyphgpu",
+					"features": [
+						"tracy"
+					]
+				}
+			]
+		}
+	}
 }

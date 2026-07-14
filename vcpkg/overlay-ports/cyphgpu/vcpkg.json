@@ -23,5 +23,10 @@
 			"name": "vcpkg-cmake-config",
 			"host": true
 		}
-	]
+	],
+	"features": {
+		"tracy": {
+			"description": "Enable Tracy integration"
+		}
+	}
 }

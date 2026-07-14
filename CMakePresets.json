@@ -112,7 +112,15 @@
 			}
 		},
 		{
-			"name": "Windows-ClangCL-Debug",
+			"name": "Windows-MSVC-Profile",
+      "inherits": "Windows-MSVC-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "VCPKG_MANIFEST_FEATURES": "tracy"
+      }
+    },
+    {
+      "name": "Windows-ClangCL-Debug",
 			"inherits": "Windows-ClangCL-base",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Debug"
@@ -129,7 +137,14 @@
 			"name": "Windows-ClangCL-Release",
 			"inherits": "Windows-ClangCL-base",
 			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Release"
+				"CMAKE_BUILD_TYPE": "Release"}
+    },
+    {
+      "name": "Windows-ClangCL-Profile",
+      "inherits": "Windows-ClangCL-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "VCPKG_MANIFEST_FEATURES": "tracy"
 			}
 		},
 		{
@@ -154,7 +169,15 @@
 			}
 		},
 		{
-			"name": "Linux-GCC-Debug",
+			"name": "Linux-Clang-Profile",
+      "inherits": "Linux-Clang-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "VCPKG_MANIFEST_FEATURES": "tracy"
+      }
+    },
+    {
+      "name": "Linux-GCC-Debug",
 			"inherits": "Linux-GCC-base",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Debug"
@@ -175,7 +198,15 @@
 			}
 		},
 		{
-			"name": "macOS-Clang-Debug",
+			"name": "Linux-GCC-Profile",
+      "inherits": "Linux-GCC-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "VCPKG_MANIFEST_FEATURES": "tracy"
+      }
+    },
+    {
+      "name": "macOS-Clang-Debug",
 			"inherits": "macOS-Clang-base",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Debug"
@@ -194,9 +225,17 @@
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Release"
 			}
-		}
-	],
-	"buildPresets": [
+		},
+	{
+	"name": "macOS-Clang-Profile",
+      "inherits": "macOS-Clang-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "VCPKG_MANIFEST_FEATURES": "tracy"
+      }
+    }
+  ],
+  "buildPresets": [
 		{
 			"name": "Windows-MSVC-Debug",
 			"configurePreset": "Windows-MSVC-Debug"
@@ -210,7 +249,11 @@
 			"configurePreset": "Windows-MSVC-Release"
 		},
 		{
-			"name": "Windows-ClangCL-Debug",
+			"name": "Windows-MSVC-Profile",
+      "configurePreset": "Windows-MSVC-Profile"
+    },
+    {
+      "name": "Windows-ClangCL-Debug",
 			"configurePreset": "Windows-ClangCL-Debug"
 		},
 		{
@@ -222,7 +265,11 @@
 			"configurePreset": "Windows-ClangCL-Release"
 		},
 		{
-			"name": "Linux-Clang-Debug",
+			"name": "Windows-ClangCL-Profile",
+      "configurePreset": "Windows-ClangCL-Profile"
+    },
+    {
+      "name": "Linux-Clang-Debug",
 			"configurePreset": "Linux-Clang-Debug"
 		},
 		{
@@ -234,7 +281,11 @@
 			"configurePreset": "Linux-Clang-Release"
 		},
 		{
-			"name": "Linux-GCC-Debug",
+			"name": "Linux-Clang-Profile",
+      "configurePreset": "Linux-Clang-Profile"
+    },
+    {
+      "name": "Linux-GCC-Debug",
 			"configurePreset": "Linux-GCC-Debug"
 		},
 		{
@@ -246,7 +297,11 @@
 			"configurePreset": "Linux-GCC-Release"
 		},
 		{
-			"name": "macOS-Clang-Debug",
+			"name": "Linux-GCC-Profile",
+      "configurePreset": "Linux-GCC-Profile"
+    },
+    {
+      "name": "macOS-Clang-Debug",
 			"configurePreset": "macOS-Clang-Debug"
 		},
 		{
@@ -256,6 +311,10 @@
 		{
 			"name": "macOS-Clang-Release",
 			"configurePreset": "macOS-Clang-Release"
-		}
-	]
+		},
+	{
+      "name": "macOS-Clang-Profile",
+      "configurePreset": "macOS-Clang-Profile"
+    }
+  ]
 }
