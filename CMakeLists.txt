@@ -61,6 +61,25 @@ set_target_properties(ParticleSimulator PROPERTIES INTERPROCEDURAL_OPTIMIZATION_
 set_target_properties(ParticleSimulator PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 set_target_properties(ParticleSimulator PROPERTIES CXX_SCAN_FOR_MODULES OFF)
 
+# ---- Install ----
+
+install(
+	TARGETS ParticleSimulator
+)
+
+file(GLOB COPYRIGHT_FILES "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/*/copyright")
+foreach (COPYRIGHT_FILE IN LISTS COPYRIGHT_FILES)
+	cmake_path(GET COPYRIGHT_FILE PARENT_PATH COPYRIGHT_PORT_DIR)
+	cmake_path(GET COPYRIGHT_PORT_DIR FILENAME COPYRIGHT_PORT)
+	if (NOT COPYRIGHT_PORT MATCHES "^vcpkg-")
+		install(
+			FILES "${COPYRIGHT_FILE}"
+			DESTINATION "share/ParticleSimulator/third-party-licenses"
+			RENAME "${COPYRIGHT_PORT}.txt"
+		)
+	endif ()
+endforeach ()
+
 # ---- Dependency: glfw3 ----
 
 target_link_libraries(ParticleSimulator PRIVATE glfw)
