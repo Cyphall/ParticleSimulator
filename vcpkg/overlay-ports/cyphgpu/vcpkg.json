@@ -28,7 +28,13 @@
 	],
 	"features": {
 		"tracy": {
-			"description": "Enable Tracy integration"
+			"description": "Enable Tracy"
+		},
+		"imgui-backend": {
+			"description": "Enable ImGui backend",
+			"dependencies": [
+				"imgui"
+			]
 		}
 	}
 }
