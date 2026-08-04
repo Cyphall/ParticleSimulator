@@ -117,15 +117,15 @@ void Renderer::draw(Camera& camera, float deltaTime, const cgpu::ImagePtr& outpu
 	rec.barrier({
 		.src_stages = vk::PipelineStageFlagBits2::eComputeShader,
 		.src_accesses = vk::AccessFlagBits2::eShaderStorageWrite,
-		vk::PipelineStageFlagBits2::eComputeShader,
+		.dst_stages = vk::PipelineStageFlagBits2::eComputeShader,
 		.dst_accesses = vk::AccessFlagBits2::eShaderStorageRead,
 	});
 
 	GravityViewPass::RenderInput gravityViewInput;
 	gravityViewInput.camera = &camera;
-	gravityViewInput.particlesBuffer = &outputBuffer;
+	gravityViewInput.particlesBuffer = _particlesBufferDst;
 	gravityViewInput.particleCount = _particleCount;
-	gravityViewInput.outputImage = currentSwapchainImage;
+	gravityViewInput.outputImage = outputImage;
 
 	_gravityViewPass->render(rec, gravityViewInput);
 #endif

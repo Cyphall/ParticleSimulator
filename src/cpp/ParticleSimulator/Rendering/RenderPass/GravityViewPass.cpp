@@ -40,7 +40,7 @@ GravityViewPass::RenderOutput GravityViewPass::render(cgpu::CommandRecorder& rec
 
 			ctx.pushParameters(0, parameters);
 
-			ctx.dispatch({cgpu::alignUp(parameters.u_size.get(), glm::uvec2{1024}) / 1024u, 1});
+			ctx.dispatch({cgpu::alignUp(parameters.u_size.get(), glm::uvec2{32}) / 32u, 1});
 		},
 	});
 
