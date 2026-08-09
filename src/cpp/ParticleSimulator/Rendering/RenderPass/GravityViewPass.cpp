@@ -30,8 +30,8 @@ GravityViewPass::RenderOutput GravityViewPass::render(cgpu::CommandRecorder& rec
 
 			parameters.u_invViewProjectionMatrix = glm::inverse(input.camera->getProjection() * input.camera->getView());
 			parameters.u_particleCount = input.particleCount;
-			parameters.u_inputParticles = ctx.getBufferDevicePtr<ParticleData>(input.particlesBuffer, cgpu::CommandRecorder::ResourceAccess::eReadonly);
-			parameters.u_outputImage = ctx.getStorageImageDescriptor(input.outputImage, cgpu::CommandRecorder::ResourceAccess::eReadWrite);
+			parameters.u_inputParticles = ctx.getBufferDevicePtr<ParticleData>(input.particlesBuffer, cgpu::StorageAccess::eReadonly);
+			parameters.u_outputImage = ctx.getStorageImageDescriptor(input.outputImage, cgpu::StorageAccess::eReadWrite);
 			parameters.u_size = glm::uvec2{input.outputImage->getDesc().extent};
 
 			ctx.dispatch(_computeShaderState, {cgpu::alignUp(parameters.u_size.get(), glm::uvec2{32}) / 32u, 1}, parameters);

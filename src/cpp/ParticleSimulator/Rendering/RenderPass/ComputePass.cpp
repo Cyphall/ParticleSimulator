@@ -34,8 +34,8 @@ ComputePass::RenderOutput ComputePass::render(cgpu::CommandRecorder& rec, const 
 			parameters.u_cursorGravityEnabled = input.cursorGravityEnabled;
 			parameters.u_cursorGravityPos = input.cursorGravityPos;
 			parameters.u_particlesGravityEnabled = input.particlesGravityEnabled;
-			parameters.u_inputParticles = ctx.getBufferDevicePtr<ParticleData>(input.particlesInputBuffer, cgpu::CommandRecorder::ResourceAccess::eReadonly);
-			parameters.u_outputParticles = ctx.getBufferDevicePtr<ParticleData>(input.particlesOutputBuffer, cgpu::CommandRecorder::ResourceAccess::eReadWrite);
+			parameters.u_inputParticles = ctx.getBufferDevicePtr<ParticleData>(input.particlesInputBuffer, cgpu::StorageAccess::eReadonly);
+			parameters.u_outputParticles = ctx.getBufferDevicePtr<ParticleData>(input.particlesOutputBuffer, cgpu::StorageAccess::eWriteonly);
 
 			ctx.dispatch(_computeShaderState, {cgpu::alignUp(input.particleCount, 1024) / 1024, 1, 1}, parameters);
 		},

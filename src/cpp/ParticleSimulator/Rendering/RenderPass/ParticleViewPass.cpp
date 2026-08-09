@@ -45,7 +45,7 @@ ParticleViewPass::RenderOutput ParticleViewPass::render(cgpu::CommandRecorder& r
 
 			parameters.u_viewProjectionMatrix = input.camera->getProjection() * input.camera->getView();
 			parameters.u_particleCount = input.particleCount;
-			parameters.u_inputParticles = ctx.getBufferDevicePtr<ParticleData>(input.particlesBuffer, cgpu::CommandRecorder::ResourceAccess::eReadonly);
+			parameters.u_inputParticles = ctx.getBufferDevicePtr<ParticleData>(input.particlesBuffer, cgpu::GraphicsStage::eVertex, cgpu::StorageAccess::eReadonly);
 
 			ctx.draw(input.particleCount, 1, 0, 0, parameters);
 		},

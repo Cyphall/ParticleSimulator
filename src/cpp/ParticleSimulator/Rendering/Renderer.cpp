@@ -99,13 +99,6 @@ void Renderer::draw(Camera& camera, float deltaTime, const cgpu::ImagePtr& outpu
 	_computePass->render(rec, computeInput);
 
 #if 1 // 1: classic point-list particle view, 0: gravity view
-	rec.barrier({
-		.src_stages = vk::PipelineStageFlagBits2::eComputeShader,
-		.src_accesses = vk::AccessFlagBits2::eShaderStorageWrite,
-		.dst_stages = vk::PipelineStageFlagBits2::eVertexShader,
-		.dst_accesses = vk::AccessFlagBits2::eShaderStorageRead,
-	});
-
 	ParticleViewPass::RenderInput particleViewInput;
 	particleViewInput.camera = &camera;
 	particleViewInput.particlesBuffer = _particlesBufferDst;
@@ -114,13 +107,6 @@ void Renderer::draw(Camera& camera, float deltaTime, const cgpu::ImagePtr& outpu
 
 	_particleViewPass->render(rec, particleViewInput);
 #else
-	rec.barrier({
-		.src_stages = vk::PipelineStageFlagBits2::eComputeShader,
-		.src_accesses = vk::AccessFlagBits2::eShaderStorageWrite,
-		.dst_stages = vk::PipelineStageFlagBits2::eComputeShader,
-		.dst_accesses = vk::AccessFlagBits2::eShaderStorageRead,
-	});
-
 	GravityViewPass::RenderInput gravityViewInput;
 	gravityViewInput.camera = &camera;
 	gravityViewInput.particlesBuffer = _particlesBufferDst;
