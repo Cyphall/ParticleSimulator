@@ -21,7 +21,6 @@ public:
 	{};
 
 	explicit ParticleViewPass(const cgpu::DeviceSessionPtr& deviceSession, vk::Format format);
-	~ParticleViewPass();
 
 	RenderOutput render(cgpu::CommandRecorder& rec, const RenderInput& input);
 

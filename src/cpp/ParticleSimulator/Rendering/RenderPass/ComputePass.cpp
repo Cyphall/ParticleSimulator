@@ -14,8 +14,6 @@ ComputePass::ComputePass(const cgpu::DeviceSessionPtr& deviceSession):
 	createShaderState();
 }
 
-ComputePass::~ComputePass() {}
-
 ComputePass::RenderOutput ComputePass::render(cgpu::CommandRecorder& rec, const RenderInput& input)
 {
 	rec.computePass({

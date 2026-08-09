@@ -21,7 +21,6 @@ public:
 	{};
 
 	explicit GravityViewPass(const cgpu::DeviceSessionPtr& deviceSession);
-	~GravityViewPass();
 
 	RenderOutput render(cgpu::CommandRecorder& rec, const RenderInput& input);
 

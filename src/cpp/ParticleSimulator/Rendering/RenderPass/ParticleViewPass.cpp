@@ -19,8 +19,6 @@ ParticleViewPass::ParticleViewPass(const cgpu::DeviceSessionPtr& deviceSession, 
 	createShaderStates(format);
 }
 
-ParticleViewPass::~ParticleViewPass() {}
-
 ParticleViewPass::RenderOutput ParticleViewPass::render(cgpu::CommandRecorder& rec, const RenderInput& input)
 {
 	rec.graphicsPass({

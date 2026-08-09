@@ -15,8 +15,6 @@ GravityViewPass::GravityViewPass(const cgpu::DeviceSessionPtr& deviceSession):
 	createShaderState();
 }
 
-GravityViewPass::~GravityViewPass() {}
-
 GravityViewPass::RenderOutput GravityViewPass::render(cgpu::CommandRecorder& rec, const RenderInput& input)
 {
 	rec.computePass({

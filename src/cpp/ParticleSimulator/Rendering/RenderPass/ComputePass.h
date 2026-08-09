@@ -23,7 +23,6 @@ public:
 	{};
 
 	explicit ComputePass(const cgpu::DeviceSessionPtr& deviceSession);
-	~ComputePass();
 
 	RenderOutput render(cgpu::CommandRecorder& rec, const RenderInput& input);
 
