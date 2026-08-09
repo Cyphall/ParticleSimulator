@@ -21,8 +21,6 @@ GravityViewPass::RenderOutput GravityViewPass::render(cgpu::CommandRecorder& rec
 {
 	rec.computePass({
 		.callback = [&](cgpu::ComputePassContext& ctx) {
-			ctx.bindPipelineStates(_computeShaderState);
-
 			struct
 			{
 				float4x4 u_invViewProjectionMatrix;
@@ -38,9 +36,7 @@ GravityViewPass::RenderOutput GravityViewPass::render(cgpu::CommandRecorder& rec
 			parameters.u_outputImage = ctx.getStorageImageDescriptor(input.outputImage, cgpu::CommandRecorder::ResourceAccess::eReadWrite);
 			parameters.u_size = glm::uvec2{input.outputImage->getDesc().extent};
 
-			ctx.pushParameters(0, parameters);
-
-			ctx.dispatch({cgpu::alignUp(parameters.u_size.get(), glm::uvec2{32}) / 32u, 1});
+			ctx.dispatch(_computeShaderState, {cgpu::alignUp(parameters.u_size.get(), glm::uvec2{32}) / 32u, 1}, parameters);
 		},
 	});
 

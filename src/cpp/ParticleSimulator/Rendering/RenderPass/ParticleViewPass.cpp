@@ -49,9 +49,7 @@ ParticleViewPass::RenderOutput ParticleViewPass::render(cgpu::CommandRecorder& r
 			parameters.u_particleCount = input.particleCount;
 			parameters.u_inputParticles = ctx.getBufferDevicePtr<ParticleData>(input.particlesBuffer, cgpu::CommandRecorder::ResourceAccess::eReadonly);
 
-			ctx.pushParameters(0, parameters);
-
-			ctx.draw(input.particleCount, 1, 0, 0);
+			ctx.draw(input.particleCount, 1, 0, 0, parameters);
 		},
 	});
 

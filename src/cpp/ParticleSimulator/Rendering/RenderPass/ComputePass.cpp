@@ -20,8 +20,6 @@ ComputePass::RenderOutput ComputePass::render(cgpu::CommandRecorder& rec, const 
 {
 	rec.computePass({
 		.callback = [&](cgpu::ComputePassContext& ctx) {
-			ctx.bindPipelineStates(_computeShaderState);
-
 			struct
 			{
 				float u_deltaTime;
@@ -41,9 +39,7 @@ ComputePass::RenderOutput ComputePass::render(cgpu::CommandRecorder& rec, const 
 			parameters.u_inputParticles = ctx.getBufferDevicePtr<ParticleData>(input.particlesInputBuffer, cgpu::CommandRecorder::ResourceAccess::eReadonly);
 			parameters.u_outputParticles = ctx.getBufferDevicePtr<ParticleData>(input.particlesOutputBuffer, cgpu::CommandRecorder::ResourceAccess::eReadWrite);
 
-			ctx.pushParameters(0, parameters);
-
-			ctx.dispatch({cgpu::alignUp(input.particleCount, 1024) / 1024, 1, 1});
+			ctx.dispatch(_computeShaderState, {cgpu::alignUp(input.particleCount, 1024) / 1024, 1, 1}, parameters);
 		},
 	});
 
