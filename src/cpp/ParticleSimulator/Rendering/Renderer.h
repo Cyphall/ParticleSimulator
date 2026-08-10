@@ -3,6 +3,7 @@
 #include <CyphGPU/CommandContext.hpp>
 #include <CyphGPU/fwd.hpp>
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
 #include <memory>
 #include <vulkan/vulkan.hpp>
 

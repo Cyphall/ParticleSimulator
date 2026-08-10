@@ -5,6 +5,7 @@
 #include <CyphGPU/ContextSession.hpp>
 #include <CyphGPU/Device.hpp>
 #include <CyphGPU/DeviceSession.hpp>
+#include <CyphGPU/ShaderBundle.hpp>
 #include <CyphGPU/Surface.hpp>
 #include <CyphGPU/Swapchain.hpp>
 #include <GLFW/glfw3.h>
