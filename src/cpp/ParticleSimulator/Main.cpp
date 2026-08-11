@@ -53,6 +53,7 @@ static std::optional<cgpu::DeviceSessionPtr> createDeviceSession()
 static std::pair<GLFWwindow*, cgpu::SurfacePtr> createWindow(const cgpu::ContextSessionPtr& contextSession)
 {
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
 
 #if !defined(NDEBUG)
 	GLFWwindow* window = glfwCreateWindow(800, 600, "ParticleSimulator", nullptr, nullptr);
