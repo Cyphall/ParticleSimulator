@@ -54,7 +54,7 @@ static std::pair<GLFWwindow*, cgpu::SurfacePtr> createWindow(const cgpu::Context
 {
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-#if _DEBUG
+#if !defined(NDEBUG)
 	GLFWwindow* window = glfwCreateWindow(800, 600, "ParticleSimulator", nullptr, nullptr);
 #else
 	GLFWmonitor* monitor = glfwGetPrimaryMonitor();
