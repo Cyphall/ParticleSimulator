@@ -26,16 +26,31 @@ static std::optional<cgpu::DeviceSessionPtr> createDeviceSession()
 		}
 	);
 
-	std::optional<cgpu::DevicePtr> selectedDevice;
+	cgpu::Device::Capabilities requiredCaps;
+	requiredCaps |= cgpu::Device::Capability::eCore;
+	requiredCaps |= cgpu::Device::Capability::eSwapchain;
+
+	std::optional<cgpu::DevicePtr> selectedDeviceDiscrete;
+	std::optional<cgpu::DevicePtr> selectedDeviceFallback;
 	for (const cgpu::DevicePtr& device : contextSession->getDevices())
 	{
-		if (device->getCapabilities() & cgpu::Device::Capability::eCore &&
-		    device->getCapabilities() & cgpu::Device::Capability::eSwapchain)
+		if ((device->getCapabilities() & requiredCaps) != requiredCaps)
 		{
-			selectedDevice = device;
-			break;
+			continue;
 		}
+
+		auto& selectedDevice =
+			device->getType() == vk::PhysicalDeviceType::eDiscreteGpu ?
+				selectedDeviceDiscrete :
+				selectedDeviceFallback;
+
+		selectedDevice = device;
 	}
+
+	std::optional<cgpu::DevicePtr> selectedDevice =
+		selectedDeviceDiscrete ?
+			selectedDeviceDiscrete :
+			selectedDeviceFallback;
 
 	if (!selectedDevice)
 	{
